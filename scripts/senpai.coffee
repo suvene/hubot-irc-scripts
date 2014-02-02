@@ -6,19 +6,26 @@
 #   hubot 誰知ってるんですか? - hubot が知ってる人を教えてくれるよ！
 #   hubot 後輩の {nickname} - hubot に面通ししよう！
 #   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えiてもらおう！
-#   hubot {アダ名} は {nickname} のアダ名  - hubot にアダ名を教えるよ！
-#   hubot {アダ名} は {nickname} のアダ名じゃない  - hubot にアダ名が間違いだったことをを教えるよ！
+#   hubot {アダ名} は {nickname} のアダ名です  - hubot にアダ名を教えるよ！
+#   hubot {アダ名} は {nickname} のアダ名じゃないです  - hubot にアダ名が間違いだったことをを教えるよ！
+#   {アダ名 or nickname}++  - イイネ！
+#   {アダ名 or nickname}--  - ヨクナイネ！
 
-aisatsu = [# {{{
+AISATSU = [# {{{
   'よろしくな'
   'まいど'
   '元気か？'
 ]# }}}
 
-nandeTameguchi = [# {{{
+NANDE_TAMEGUCHI = [# {{{
   'つか、何でタメ口なん？'
   '口のききかたに気をつけや'
 ]# }}}
+
+COUNT_PLUS = [
+  'すげーな！'
+  '人気でてるぞ'
+]
 
 # {{{ existsUser
 existsUser = (robot, msg, name) ->
@@ -57,6 +64,16 @@ getUserInfo = (robot, msg, name, key) ->
   usersInfo[name][key]
 # }}}
 
+
+whoIsThis = (robot, msg, name) -># {{{
+  return name if existsUser robot, msg, name
+  gNicknames = getSenpaiStorage robot, msg, 'NICKNAMES'
+  gNicknames ||= {}
+  return gNicknames[name] if gNicknames[name]
+  return null
+# }}}
+
+
 # {{{ Keigo
 REGEXP_KEIGO = '(です|デス|desu|ます|マス|masu|っす|ッス)か?[\?？!！]?'
 
@@ -67,7 +84,7 @@ trimKeigo = (str) ->
   str.replace new RegExp('' + REGEXP_KEIGO + '$'), ''
 
 checkKeigo = (robot, msg) =>
-  msg.send msg.random nandeTameguchi unless isKeigo robot, msg
+  msg.send msg.random NANDE_TAMEGUCHI unless isKeigo robot, msg
 # }}}
 
 module.exports = (robot) ->
@@ -81,7 +98,7 @@ module.exports = (robot) ->
       msg.send "#{msg.message.user.name} こいつ誰？ > all"
       checkKeigo robot, msg
       return
-    msg.send msg.random aisatsu
+    msg.send msg.random AISATSU
     checkKeigo robot, msg
 # }}}
 
@@ -191,3 +208,22 @@ module.exports = (robot) ->
     setUserInfo robot, msg, realname, 'NICKNAMES', newNicknames
     checkKeigo robot, msg
 # }}}
+
+# {{{ plusplus
+  robot.hear /([^ ]+)\+\+/i, (msg) ->
+    name = msg.match[1]
+
+    user = whoIsThis robot, msg, name
+    unless user?
+      msg.send "#{realname} って誰？先に教えて"
+      return
+
+    count = getUserInfo robot, msg, user, 'COUNT'
+    count ||= 0
+    count++
+    setUserInfo robot, msg, user, 'COUNT', count
+
+    msg.send "#{name}: #{count}点 " + msg.random COUNT_PLUS
+# }}}
+
+
