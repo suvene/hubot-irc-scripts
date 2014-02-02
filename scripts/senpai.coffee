@@ -13,12 +13,20 @@
 #   {アダ名 or nickname}--  - ヨクナイネ！
 #   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
 
-
-AISATSU = [# {{{
+# {{{ AISATSU
+AISATSU_YOROSHIKU = [
   'よろしくな'
   'まいど'
   '元気か？'
-]# }}}
+]
+
+AISATSU_OHAYO = [
+  'おう、おはよう。今日はがんばれよ'
+  'おはよう、ちょっとネムいな'
+  '今日飲みに行くか'
+  'おはよう。今日金曜日だっけ？'
+]
+#}}}
 
 NANDE_TAMEGUCHI = [# {{{
   'つか、何でタメ口なん？'
@@ -95,7 +103,8 @@ trimKeigo = (str) ->
   str.replace new RegExp('' + REGEXP_KEIGO + '$'), ''
 
 checkKeigo = (robot, msg) =>
-  msg.send msg.random NANDE_TAMEGUCHI unless isKeigo robot, msg
+  unless isKeigo robot, msg
+    msg.send msg.random NANDE_TAMEGUCHI if Math.random 0 < 0.1
 # }}}
 
 # {{{ Keisho
@@ -110,13 +119,21 @@ module.exports = (robot) ->
     robot.brain.data.usersInfo ||= {}
 # }}}
 
-  robot.respond /よろしく/, (msg) -># {{{
-    unless existsUser robot, msg, msg.message.user.name
+# {{{ あいさつ
+  robot.respond /よろしく/, (msg) ->
+    unless whoIsThis robot, msg, msg.message.user.name
       msg.send "#{msg.message.user.name} こいつ誰？ > all"
       checkKeigo robot, msg
       return
-    msg.send msg.random AISATSU
+    msg.send msg.random AISATSU_YOROSHIKU
     checkKeigo robot, msg
+
+  robot.respond /おはよう/, (msg) ->
+    unless whoIsThis robot, msg, msg.message.user.name
+      msg.send "#{msg.message.user.name} こいつ誰？ > all"
+      checkKeigo robot, msg
+      return
+    msg.send msg.random AISATSU_OHAYO
 # }}}
 
   robot.respond /後輩の[ ]*([^ ]+)/, (msg) -># {{{
@@ -135,7 +152,7 @@ module.exports = (robot) ->
     return
 # }}}
 
-  robot.respond /([^ ]+)[ ]*のことは忘れてください/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*のことは忘れて/, (msg) -># {{{
     name = msg.match[1]
     name = trimKeigo name
     name = trimKeisho name
@@ -198,7 +215,7 @@ module.exports = (robot) ->
 
 # }}}
 
-  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*って呼ばれ/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*(って|と)呼ばれ/, (msg) -># {{{
     return if msg.message.match('ない|ません')
     realname = msg.match[1]
     nickname = msg.match[2]
@@ -233,7 +250,7 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
-  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*って呼ばれて(ない|ません)/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*(って|と)呼ばれて(ない|ませ)/, (msg) -># {{{
     realname = msg.match[1]
     nickname = msg.match[2]
     nickname = trimKeisho nickname
@@ -270,11 +287,19 @@ module.exports = (robot) ->
 # {{{ plusplus
   robot.hear /([^ ]+)\+\+/i, (msg) ->
     name = msg.match[1]
-
+    name = trimKeisho name
     user = whoIsThis robot, msg, name
+    fromname = msg.message.user.name
+    fromuser = whoIsThis robot, msg, fromname
+
     unless user?
       msg.send "#{name} って誰？先に教えて"
       return
+
+    if user is fromuser
+      msg.send "#{name} 自分で点数いれんなよ。悲しいやつだな"
+      return
+
 
     count = getUserInfo robot, msg, user, 'COUNT'
     count ||= 0
@@ -290,8 +315,9 @@ module.exports = (robot) ->
 # {{{ minusminus
   robot.hear /([^ ]+)--/i, (msg) ->
     name = msg.match[1]
-
+    name = trimKeisho name
     user = whoIsThis robot, msg, name
+
     unless user?
       msg.send "#{name} って誰？先に教えて"
       return
