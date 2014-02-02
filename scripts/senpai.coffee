@@ -5,11 +5,12 @@
 #   hubot よろしくお願いします！ - hubot に挨拶しよう！
 #   hubot 誰知ってるんですか? - hubot が知ってる人を教えてくれるよ！
 #   hubot 後輩の {nickname} - hubot に面通ししよう！
-#   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えiてもらおう！
+#   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えてもらおう！
 #   hubot {アダ名} は {nickname} のアダ名です  - hubot にアダ名を教えるよ！
 #   hubot {アダ名} は {nickname} のアダ名じゃないです  - hubot にアダ名が間違いだったことをを教えるよ！
 #   {アダ名 or nickname}++  - イイネ！
 #   {アダ名 or nickname}--  - ヨクナイネ！
+#   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
 
 AISATSU = [# {{{
   'よろしくな'
@@ -22,10 +23,19 @@ NANDE_TAMEGUCHI = [# {{{
   '口のききかたに気をつけや'
 ]# }}}
 
+# {{{ COUNT
 COUNT_PLUS = [
   'すげーな！'
   '人気でてるぞ'
+  'あんまり調子乗るなよ？'
 ]
+
+COUNT_MINUS = [
+  'どんまい、頑張ろうぜ'
+  'まぁしょうがないな'
+  '見返してやろうぜ'
+]
+# }}}
 
 # {{{ existsUser
 existsUser = (robot, msg, name) ->
@@ -215,7 +225,7 @@ module.exports = (robot) ->
 
     user = whoIsThis robot, msg, name
     unless user?
-      msg.send "#{realname} って誰？先に教えて"
+      msg.send "#{user} って誰？先に教えて"
       return
 
     count = getUserInfo robot, msg, user, 'COUNT'
@@ -226,4 +236,33 @@ module.exports = (robot) ->
     msg.send "#{name}: #{count}点 " + msg.random COUNT_PLUS
 # }}}
 
+# {{{ minusminus
+  robot.hear /([^ ]+)--/i, (msg) ->
+    name = msg.match[1]
 
+    user = whoIsThis robot, msg, name
+    unless user?
+      msg.send "#{user} って誰？先に教えて"
+      return
+
+    count = getUserInfo robot, msg, user, 'COUNT'
+    count ||= 0
+    count--
+    setUserInfo robot, msg, user, 'COUNT', count
+
+    msg.send "#{name}: #{count}点 " + msg.random COUNT_MINUS
+# }}}
+
+  robot.respond /([^ ]+)[ ]*何点/i, (msg) -># {{{
+    name = msg.match[1]
+    user = whoIsThis robot, msg, name
+    unless user?
+      msg.send "#{user} ってしらねーなぁ"
+      return
+
+    count = getUserInfo robot, msg, user, 'COUNT'
+    count ||= 0
+
+    msg.send "#{name} は #{count}点だな"
+    checkKeigo robot, msg
+# }}}
