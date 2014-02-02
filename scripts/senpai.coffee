@@ -97,6 +97,12 @@ checkKeigo = (robot, msg) =>
   msg.send msg.random NANDE_TAMEGUCHI unless isKeigo robot, msg
 # }}}
 
+# {{{ Keisho
+REGEXP_KEISHO = '(君|くん|クン|さん|サン|ちゃん|チャン)'
+trimKeisho = (str) ->
+  str.replace new RegExp('' + REGEXP_KEISHO + '$'), ''
+# }}}
+
 module.exports = (robot) ->
   robot.brain.on 'loaded', =># {{{
     robot.brain.data.senpaiStorage ||= {}
@@ -115,6 +121,7 @@ module.exports = (robot) ->
   robot.respond /後輩の[ ]*([^ ]+)/, (msg) -># {{{
     name = msg.match[1]
     name = trimKeigo name
+    name = trimKeisho name
     if existsUser robot, msg, name
       msg.send "知ってるしw"
       checkKeigo robot, msg
@@ -135,6 +142,7 @@ module.exports = (robot) ->
 
   robot.respond /([^ ]+)[ ]*って(誰|だれ)/, (msg) -># {{{
     name = msg.match[1]
+    name = trimKeisho name
     user = whoIsThis robot, msg, name
     unless user?
       msg.send "#{user}？俺もしらねーなぁ"
@@ -174,6 +182,7 @@ module.exports = (robot) ->
     return if msg.message.match('ない|ません')
     realname = msg.match[1]
     nickname = msg.match[2]
+    nickname = trimKeisho nickname
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
       checkKeigo robot, msg
@@ -207,6 +216,7 @@ module.exports = (robot) ->
   robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*って呼ばれて(ない|ません)/, (msg) -># {{{
     realname = msg.match[1]
     nickname = msg.match[2]
+    nickname = trimKeisho nickname
     unless existsUser robot, msg, realname
       msg.send "そもそも #{realname} って誰?"
       checkKeigo robot, msg
@@ -273,6 +283,7 @@ module.exports = (robot) ->
 
   robot.respond /([^ ]+)[ ]*何点/i, (msg) -># {{{
     name = msg.match[1]
+    name = trimKeisho name
     user = whoIsThis robot, msg, name
     unless user?
       msg.send "#{name} ってしらねーなぁ"
