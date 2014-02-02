@@ -130,6 +130,18 @@ module.exports = (robot) ->
     msg.send "#{name} か。よろしくな"
 # }}}
 
+  robot.respond /([^ ]+)[ ]*のことは忘れてください/, (msg) -># {{{
+    name = msg.match[1]
+    name = trimKeigo name
+    name = trimKeisho name
+    unless existsUser robot, msg, name
+      msg.send "いや、元々しらねーしw"
+      checkKeigo robot, msg
+      return
+    delete robot.brain.data.usersInfo[name]
+    msg.send "#{name} か。新たな旅にでちまったんだなぁ……"
+# }}}
+
   robot.respond /誰知って/, (msg) -># {{{
     users = robot.brain.data.usersInfo ||= {}
     ret = []
@@ -155,7 +167,7 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
-  robot.respond /([^ ]+)[ ]*のアダ名(何|なん|なに)/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*のアダ名は?(何|なん|なに)/, (msg) -># {{{
     realname = msg.match[1]
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
