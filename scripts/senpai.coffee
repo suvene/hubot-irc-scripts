@@ -3,9 +3,9 @@
 #
 # Commands:
 #   hubot よろしくお願いします！ - hubot に挨拶しよう！
+#   hubot 後輩の {nickname} - hubot に面通ししよう！
 #   hubot 誰知ってるんですか? - hubot が知ってる人を教えてくれるよ！
 #   hubot {アダ名 or nickname} って誰ですか？ - 誰かよくわからない場合は hubot に聞いてみよう！
-#   hubot 後輩の {nickname} - hubot に面通ししよう！
 #   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えてもらおう！
 #   hubot {アダ名} は {nickname} のアダ名です  - hubot にアダ名を教えるよ！
 #   hubot {アダ名} は {nickname} のアダ名じゃないです  - hubot にアダ名が間違いだったことをを教えるよ！
@@ -112,6 +112,17 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
+  robot.respond /後輩の[ ]*([^ ]+)/, (msg) -># {{{
+    name = msg.match[1]
+    name = trimKeigo name
+    if existsUser robot, msg, name
+      msg.send "知ってるしw"
+      checkKeigo robot, msg
+      return
+    robot.brain.data.usersInfo[name] = {}
+    msg.send "#{name} か。よろしくな"
+# }}}
+
   robot.respond /誰知って/, (msg) -># {{{
     users = robot.brain.data.usersInfo ||= {}
     ret = []
@@ -134,17 +145,6 @@ module.exports = (robot) ->
     else
       msg.send "#{name} は #{user} だのことだ。"
     checkKeigo robot, msg
-# }}}
-
-  robot.respond /後輩の[ ]*([^ ]+)/, (msg) -># {{{
-    name = msg.match[1]
-    name = trimKeigo name
-    if existsUser robot, msg, name
-      msg.send "知ってるしw"
-      checkKeigo robot, msg
-      return
-    robot.brain.data.usersInfo[name] = {}
-    msg.send "#{name} か。よろしくな"
 # }}}
 
   robot.respond /([^ ]+)[ ]*のアダ名(何|なん|なに)/, (msg) -># {{{
