@@ -4,6 +4,7 @@
 # Commands:
 #   hubot よろしくお願いします！ - hubot に挨拶しよう！
 #   hubot 誰知ってるんですか? - hubot が知ってる人を教えてくれるよ！
+#   hubot {アダ名 or nickname} って誰ですか？ - 誰かよくわからない場合は hubot に聞いてみよう！
 #   hubot 後輩の {nickname} - hubot に面通ししよう！
 #   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えてもらおう！
 #   hubot {アダ名} は {nickname} のアダ名です  - hubot にアダ名を教えるよ！
@@ -118,6 +119,20 @@ module.exports = (robot) ->
       ret.push u
     ret = ret.join('だろ, ')
     msg.send "えーっと #{ret} かな"
+    checkKeigo robot, msg
+# }}}
+
+  robot.respond /([^ ]+)[ ]*って(誰|だれ)/, (msg) -># {{{
+    name = msg.match[1]
+    user = whoIsThis robot, msg, name
+    unless user?
+      msg.send "#{user}？俺もしらねーなぁ"
+      return
+
+    if name is user
+      msg.send "#{name} は #{name} だろ。大丈夫か？"
+    else
+      msg.send "#{name} は #{user} だのことだ。"
     checkKeigo robot, msg
 # }}}
 
