@@ -12,6 +12,7 @@
 #   {アダ名 or nickname}--  - ヨクナイネ！
 #   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
 
+
 AISATSU = [# {{{
   'よろしくな'
   'まいど'
@@ -74,7 +75,6 @@ getUserInfo = (robot, msg, name, key) ->
   usersInfo[name][key]
 # }}}
 
-
 whoIsThis = (robot, msg, name) -># {{{
   return name if existsUser robot, msg, name
   gNicknames = getSenpaiStorage robot, msg, 'NICKNAMES'
@@ -82,7 +82,6 @@ whoIsThis = (robot, msg, name) -># {{{
   return gNicknames[name] if gNicknames[name]
   return null
 # }}}
-
 
 # {{{ Keigo
 REGEXP_KEIGO = '(です|デス|desu|ます|マス|masu|っす|ッス)か?[\?？!！]?'
@@ -122,7 +121,7 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
-  robot.respond /後輩の ([^ ]+)/, (msg) -># {{{
+  robot.respond /後輩の[ ]*([^ ]+)/, (msg) -># {{{
     name = msg.match[1]
     name = trimKeigo name
     if existsUser robot, msg, name
@@ -133,7 +132,7 @@ module.exports = (robot) ->
     msg.send "#{name} か。よろしくな"
 # }}}
 
-  robot.respond /([^ ]+) のアダ名何/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*のアダ名(何|なん|なに)/, (msg) -># {{{
     realname = msg.match[1]
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
@@ -156,7 +155,7 @@ module.exports = (robot) ->
 
 # }}}
 
-  robot.respond /([^ ]+) は ([^ ]+) のアダ名/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*のアダ名/, (msg) -># {{{
     return if msg.message.match('じゃない')
     nickname = msg.match[1]
     realname = msg.match[2]
@@ -190,7 +189,7 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
-  robot.respond /([^ ]+) は ([^ ]+) のアダ名(じゃない)/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*のアダ名(じゃない)/, (msg) -># {{{
     nickname = msg.match[1]
     realname = msg.match[2]
     unless existsUser robot, msg, realname
