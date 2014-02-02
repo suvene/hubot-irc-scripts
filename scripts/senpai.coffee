@@ -41,6 +41,7 @@ COUNT_MINUS = [
 
 # {{{ existsUser
 existsUser = (robot, msg, name) ->
+  return true if name is robot.name
   users = robot.brain.data.usersInfo ||= {}
   for u, v of users
     if u is name
@@ -122,31 +123,38 @@ module.exports = (robot) ->
     name = msg.match[1]
     name = trimKeigo name
     name = trimKeisho name
-    if existsUser robot, msg, name
+    if name is robot.name
+      msg.send "それ俺だろw"
+    else if existsUser robot, msg, name
       msg.send "知ってるしw"
-      checkKeigo robot, msg
-      return
-    robot.brain.data.usersInfo[name] = {}
-    msg.send "#{name} か。よろしくな"
+    else
+      robot.brain.data.usersInfo[name] = {}
+      msg.send "#{name} か。よろしくな"
+
+    checkKeigo robot, msg
+    return
 # }}}
 
   robot.respond /([^ ]+)[ ]*のことは忘れてください/, (msg) -># {{{
     name = msg.match[1]
     name = trimKeigo name
     name = trimKeisho name
-    unless existsUser robot, msg, name
+    if name is robot.name
+      msg.send "俺は俺を忘れねぇ!"
+    else unless existsUser robot, msg, name
       msg.send "いや、元々しらねーしw"
-      checkKeigo robot, msg
-      return
-    delete robot.brain.data.usersInfo[name]
-    msg.send "#{name} か。新たな旅にでちまったんだなぁ……"
+    else
+      delete robot.brain.data.usersInfo[name]
+      msg.send "#{name} か。新たな旅にでちまったんだなぁ……"
+    checkKeigo robot, msg
+    return
 # }}}
 
-  robot.respond /誰知って/, (msg) -># {{{
+  robot.respond /(誰|だれ)(知|し)って/, (msg) -># {{{
     users = robot.brain.data.usersInfo ||= {}
     ret = []
     for u, v of users
-      ret.push u
+      ret.push u unless u is robot.name
     ret = ret.join('だろ, ')
     msg.send "えーっと #{ret} かな"
     checkKeigo robot, msg
@@ -265,7 +273,7 @@ module.exports = (robot) ->
 
     user = whoIsThis robot, msg, name
     unless user?
-      msg.send "#{user} って誰？先に教えて"
+      msg.send "#{name} って誰？先に教えて"
       return
 
     count = getUserInfo robot, msg, user, 'COUNT'
@@ -273,7 +281,10 @@ module.exports = (robot) ->
     count++
     setUserInfo robot, msg, user, 'COUNT', count
 
-    msg.send "#{name}: #{count}点 " + msg.random COUNT_PLUS
+    if user is robot.name
+      msg.send "俺: #{count}点 サンキューな"
+    else
+      msg.send "#{name}: #{count}点 " + msg.random COUNT_PLUS
 # }}}
 
 # {{{ minusminus
@@ -282,7 +293,7 @@ module.exports = (robot) ->
 
     user = whoIsThis robot, msg, name
     unless user?
-      msg.send "#{user} って誰？先に教えて"
+      msg.send "#{name} って誰？先に教えて"
       return
 
     count = getUserInfo robot, msg, user, 'COUNT'
@@ -290,7 +301,10 @@ module.exports = (robot) ->
     count--
     setUserInfo robot, msg, user, 'COUNT', count
 
-    msg.send "#{name}: #{count}点 " + msg.random COUNT_MINUS
+    if user is robot.name
+      msg.send "俺: #{count}点 まいったな"
+    else
+      msg.send "#{name}: #{count}点 " + msg.random COUNT_MINUS
 # }}}
 
   robot.respond /([^ ]+)[ ]*何点/i, (msg) -># {{{
@@ -307,3 +321,4 @@ module.exports = (robot) ->
     msg.send "#{name} は #{count}点だな"
     checkKeigo robot, msg
 # }}}
+
