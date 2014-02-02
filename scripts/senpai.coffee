@@ -7,8 +7,8 @@
 #   hubot 誰知ってるんですか? - hubot が知ってる人を教えてくれるよ！
 #   hubot {アダ名 or nickname} って誰ですか？ - 誰かよくわからない場合は hubot に聞いてみよう！
 #   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えてもらおう！
-#   hubot {アダ名} は {nickname} のアダ名です  - hubot にアダ名を教えるよ！
-#   hubot {アダ名} は {nickname} のアダ名じゃないです  - hubot にアダ名が間違いだったことをを教えるよ！
+#   hubot {nickname} は {アダ名} って呼ばれてます - hubot にアダ名を教えるよ！
+#   hubot {nickname} は {アダ名} って呼ばれてないです  - hubot にアダ名が間違いだったことを教えるよ！
 #   {アダ名 or nickname}++  - イイネ！
 #   {アダ名 or nickname}--  - ヨクナイネ！
 #   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
@@ -85,7 +85,7 @@ whoIsThis = (robot, msg, name) -># {{{
 # }}}
 
 # {{{ Keigo
-REGEXP_KEIGO = '(です|デス|desu|ます|マス|masu|っす|ッス)か?[\?？!！]?'
+REGEXP_KEIGO = '(です|デス|desu|ます|マス|masu|っす|ッス|ません|マセン|masen)か?[\?？!！]?'
 
 isKeigo = (robot, msg) ->
   msg.message.match(REGEXP_KEIGO) isnt null
@@ -170,10 +170,10 @@ module.exports = (robot) ->
 
 # }}}
 
-  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*のアダ名/, (msg) -># {{{
-    return if msg.message.match('じゃない')
-    nickname = msg.match[1]
-    realname = msg.match[2]
+  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*って呼ばれ/, (msg) -># {{{
+    return if msg.message.match('ない|ません')
+    realname = msg.match[1]
+    nickname = msg.match[2]
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
       checkKeigo robot, msg
@@ -204,9 +204,9 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
-  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*のアダ名(じゃない)/, (msg) -># {{{
-    nickname = msg.match[1]
-    realname = msg.match[2]
+  robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*って呼ばれて(ない|ません)/, (msg) -># {{{
+    realname = msg.match[1]
+    nickname = msg.match[2]
     unless existsUser robot, msg, realname
       msg.send "そもそも #{realname} って誰?"
       checkKeigo robot, msg
@@ -217,8 +217,13 @@ module.exports = (robot) ->
     nicknames = getUserInfo robot, msg, realname, 'NICKNAMES'
     nicknames ||= []
 
-    unless nickname in nicknames
-      msg.send "#{realname} は #{nickname} なんて呼ばれてないで"
+    gRealname = gNicknames[nickname]
+    if gRealname? and gRealname isnt realname
+      msg.send "だってそれ #{gRealname} のアダ名やろ？"
+      checkKeigo robot, msg
+      return
+    else unless nickname in nicknames
+      msg.send "#{realname} が #{nickname} って呼ばれてるなんて聞いたことないでw"
       checkKeigo robot, msg
       return
 
@@ -228,7 +233,6 @@ module.exports = (robot) ->
     gNicknames[nickname] = null
     setSenpaiStorage robot, msg, 'NICKNAMES', gNicknames
     newNicknames = (item for item in nicknames when item isnt nickname)
-    msg.send "nick #{newNicknames}"
     setUserInfo robot, msg, realname, 'NICKNAMES', newNicknames
     checkKeigo robot, msg
 # }}}
@@ -271,7 +275,7 @@ module.exports = (robot) ->
     name = msg.match[1]
     user = whoIsThis robot, msg, name
     unless user?
-      msg.send "#{user} ってしらねーなぁ"
+      msg.send "#{name} ってしらねーなぁ"
       return
 
     count = getUserInfo robot, msg, user, 'COUNT'
