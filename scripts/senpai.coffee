@@ -114,7 +114,7 @@ trimKeisho = (str) ->
 # }}}
 
 class History # {{{
-  constructor: (@robot, @msg, @cache, @keep = 10) ->
+  constructor: (@robot, @msg, @cache, @keep = 5000) ->
     @cache ||= []
 
   add: (message) ->
@@ -127,6 +127,7 @@ class History # {{{
     if (lines > @cache.length)
       lines = @cache.length
 #    reply = 'Showing ' + lines + ' lines of history:\n'
+    reply = ''
     reply = reply + @entryToString(message) + '\n' for message in @cache[-lines..]
     return reply
 
@@ -230,11 +231,11 @@ module.exports = (robot) ->
     if name is user
       msg.send "#{name} は #{name} だろ。大丈夫か？"
     else
-      msg.send "#{name} は #{user} だのことだ。"
+      msg.send "#{name} は #{user} のことだ。"
     checkKeigo robot, msg
 # }}}
 
-  robot.respond /([^ ]+)[ ]*のアダ名は?(何|なん|なに)/, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*の(あだ|アダ)名は?(何|なん|なに)/, (msg) -># {{{
     realname = msg.match[1]
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
@@ -423,4 +424,8 @@ module.exports = (robot) ->
 
     checkKeigo robot, msg
 # }}}
+
+  robot.respond /DIE$/i, (msg) ->
+    msg.send "どうやら俺の人生もここまでだ。みん元気でな"
+    process.exit 0
 
