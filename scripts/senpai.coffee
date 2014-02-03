@@ -113,6 +113,44 @@ trimKeisho = (str) ->
   str.replace new RegExp('' + REGEXP_KEISHO + '$'), ''
 # }}}
 
+class History # {{{
+  constructor: (@robot, @msg, @cache, @keep = 10) ->
+    @cache ||= []
+
+  add: (message) ->
+    @cache.push message
+    while @cache.length > @keep
+      @cache.shift()
+    @cache
+
+  show: (lines) ->
+    if (lines > @cache.length)
+      lines = @cache.length
+#    reply = 'Showing ' + lines + ' lines of history:\n'
+    reply = reply + @entryToString(message) + '\n' for message in @cache[-lines..]
+    return reply
+
+  entryToString: (event) ->
+    return '[' + event.month + '/' + event.date + ' ' + event.hours + ':' + event.minutes + '] ' + event.name + 'から: ' + event.message
+
+  clear: ->
+    @cache = []
+
+class HistoryEntry
+  constructor: (@name, @message) ->
+    @time = new Date()
+    @month = @time.getMonth() + 1
+    if @month < 10
+      @month = '0' + @month
+    @date = @time.getDate()
+    if @date < 10
+      @date = '0' + @date
+    @hours = @time.getHours()
+    @minutes = @time.getMinutes()
+    if @minutes < 10
+      @minutes = '0' + @minutes
+# }}}
+
 module.exports = (robot) ->
   robot.brain.on 'loaded', =># {{{
     robot.brain.data.senpaiStorage ||= {}
@@ -121,16 +159,20 @@ module.exports = (robot) ->
 
 # {{{ あいさつ
   robot.respond /よろしく/, (msg) ->
-    unless whoIsThis robot, msg, msg.message.user.name
-      msg.send "#{msg.message.user.name} こいつ誰？ > all"
+    fromname = msg.message.user.name
+    fromuser = whoIsThis robot, msg, fromname
+    unless whoIsThis robot, msg, fromuser
+      msg.send "#{fromuser} こいつ誰？ > all"
       checkKeigo robot, msg
       return
     msg.send msg.random AISATSU_YOROSHIKU
     checkKeigo robot, msg
 
   robot.respond /おはよう/, (msg) ->
-    unless whoIsThis robot, msg, msg.message.user.name
-      msg.send "#{msg.message.user.name} こいつ誰？ > all"
+    fromname = msg.message.user.name
+    fromuser = whoIsThis robot, msg, fromname
+    unless whoIsThis robot, msg, fromuser
+      msg.send "#{fromuser} こいつ誰？ > all"
       checkKeigo robot, msg
       return
     msg.send msg.random AISATSU_OHAYO
@@ -285,26 +327,39 @@ module.exports = (robot) ->
 # }}}
 
 # {{{ plusplus
-  robot.hear /([^ ]+)\+\+/i, (msg) ->
+  robot.hear /([^ ]+)(\+\+[ ]*(.*))/i, (msg) ->
+    fromname = msg.message.user.name
+    fromuser = whoIsThis robot, msg, fromname
+    unless whoIsThis robot, msg, fromuser
+      msg.send "#{fromuser} こいつ誰？ > all"
+      checkKeigo robot, msg
+      return
+
     name = msg.match[1]
     name = trimKeisho name
     user = whoIsThis robot, msg, name
-    fromname = msg.message.user.name
-    fromuser = whoIsThis robot, msg, fromname
+    reason = msg.match[2]
 
     unless user?
       msg.send "#{name} って誰？先に教えて"
+      checkKeigo robot, msg
       return
 
     if user is fromuser
       msg.send "#{name} 自分で点数いれんなよ。悲しいやつだな"
+      checkKeigo robot, msg
       return
-
 
     count = getUserInfo robot, msg, user, 'COUNT'
     count ||= 0
     count++
     setUserInfo robot, msg, user, 'COUNT', count
+
+    count_history = getUserInfo robot, msg, user, 'COUNT_HISTORY'
+    history = new History(robot, msg, count_history)
+    historyentry = new HistoryEntry(fromuser, reason)
+    count_history = history.add historyentry
+    setUserInfo robot, msg, user, 'COUNT_HISTORY', count_history
 
     if user is robot.name
       msg.send "俺: #{count}点 サンキューな"
@@ -313,19 +368,35 @@ module.exports = (robot) ->
 # }}}
 
 # {{{ minusminus
-  robot.hear /([^ ]+)--/i, (msg) ->
+  robot.hear /([^ ]+)(--[ ]*(.*))/i, (msg) ->
+    fromname = msg.message.user.name
+    fromuser = whoIsThis robot, msg, fromname
+    unless whoIsThis robot, msg, fromuser
+      msg.send "#{fromuser} こいつ誰？ > all"
+      checkKeigo robot, msg
+      return
+
     name = msg.match[1]
     name = trimKeisho name
     user = whoIsThis robot, msg, name
+    reason = msg.match[2]
 
     unless user?
       msg.send "#{name} って誰？先に教えて"
+      checkKeigo robot, msg
       return
 
     count = getUserInfo robot, msg, user, 'COUNT'
+
     count ||= 0
     count--
     setUserInfo robot, msg, user, 'COUNT', count
+
+    count_history = getUserInfo robot, msg, user, 'COUNT_HISTORY'
+    history = new History(robot, msg, count_history)
+    historyentry = new HistoryEntry(fromuser, reason)
+    count_history = history.add historyentry
+    setUserInfo robot, msg, user, 'COUNT_HISTORY', count_history
 
     if user is robot.name
       msg.send "俺: #{count}点 まいったな"
@@ -345,6 +416,11 @@ module.exports = (robot) ->
     count ||= 0
 
     msg.send "#{name} は #{count}点だな"
+
+    count_history = getUserInfo robot, msg, user, 'COUNT_HISTORY'
+    history = new History(robot, msg, count_history, 5)
+    msg.send history.show 5
+
     checkKeigo robot, msg
 # }}}
 
