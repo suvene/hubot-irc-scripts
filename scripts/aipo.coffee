@@ -13,35 +13,33 @@ request = require('request')
 cheerio = require('cheerio')
 url = require('url')
 query = require('querystring')
+cronJob = require('cron').CronJob
 
 PATH_ACTIVITY = '/portal/media-type/html/user/h_sakaguchi_admin/page/default.psml/js_peid/P-143fe3e7fc1-10a40?action=controls.Maximize'
 
 # {{{ SenpaiStorage
-setSenpaiStorage = (robot, msg, key, val) ->
+setSenpaiStorage = (robot, key, val) ->
   storage = robot.brain.data.senpaiStorage ||= {}
   storage[key] = val
 #  msg.send "storage #{key}, #{val}"
   robot.brain.data.senpaiStorage = storage
 
-getSenpaiStorage = (robot, msg, key) ->
+getSenpaiStorage = (robot, key) ->
   storage = robot.brain.data.senpaiStorage ||= {}
   storage[key]
 # }}}
 
 class Aipo
-  constructor: (url, user, pass) ->
-    @url = url
-    @user = user
-    @pass = pass
+  constructor: (@robot, @room, @url, @user, @pass) ->
     @jar = request.jar()
 
-  login: (robot, msg, callback) ->
+  login: (callback) ->
     @get "/", {username: @user, password: @pass}, callback
 
-  getActivity: (robot, msg) ->
-    @login robot, msg, (error, response, $) =>
+  getActivity: () ->
+    @login (error, response, $) =>
       @get PATH_ACTIVITY, null, (error, response, $) =>
-        cacheActivities = getSenpaiStorage robot, msg, 'AIPO_ACTIVITIES'
+        cacheActivities = getSenpaiStorage @robot, 'AIPO_ACTIVITIES'
         cacheActivities ||= []
         $('.auiRowTable tbody tr').each((i, elem) =>
           return if i > 5 or i is  0
@@ -49,16 +47,23 @@ class Aipo
           val = text.split(',')
           text = val[2] + ': ' + val[1]
           # a = $(elem).find('a')
-#          return if text in cacheActivities
+          return if text in cacheActivities
           cacheActivities.push text
-          msg.send "Aipo #{text}"
+          @send "Aipo更新通知 #{text}"
         )
-        setSenpaiStorage robot, msg, 'AIPO_ACTIVITIES', cacheActivities
+        while cacheActivities.length > 100
+          cacheActivities.shift()
+        setSenpaiStorage msg, 'AIPO_ACTIVITIES', cacheActivities
+
+  send: (msg) ->
+    response = new @robot.Response(@robot, {user : {id : -1, name : @room}, text : "none", done : false}, [])
+    # console.log @room + ':' + msg
+    response.send msg
 
   # Private: do a GET request against the API
   get: (path, params, callback) ->
     path = "#{path}?#{query.stringify params}" if params?
-    console.log 'get: ' + path
+    # console.log 'get: ' + path
     @request "GET", path, null, callback
 
   # Private: do a POST request against the API
@@ -88,7 +93,7 @@ class Aipo
       "strictSSL": false
       "jar": @jar
 
-    console.log options.url
+    # console.log options.url
     request options, (error, response, data) ->
       if !error and response?.statusCode is 200
         #console.log data
@@ -97,11 +102,20 @@ class Aipo
       else
         console.log 'error: ' + response?.statusCode
         console.log error
-        msg.send "Aipo がなんかエラーやわ"
+        @send "Aipo がなんかエラーやわ"
 
 module.exports = (robot) ->
-  aipo = new Aipo process.env.HUBOT_AIPO_BASE_URL, process.env.HUBOT_AIPO_USER, process.env.HUBOT_AIPO_PASSWORD
+  aipo = new Aipo robot, process.env.HUBOT_AIPO_SEND_ROOM, process.env.HUBOT_AIPO_BASE_URL, process.env.HUBOT_AIPO_USER, process.env.HUBOT_AIPO_PASSWORD
 
-  robot.respond /aipo/i, (msg) ->
-    aipo.getActivity robot, msg
+  getActivity = () ->
+    console.log 'start getActivity!!!'
+    aipo.getActivity()
+
+  robot.respond /aipo activity/i, (msg) ->
+    getActivity()
+
+  # *(sec) *(min) *(hour) *(day) *(month) *(day of the week)
+  new cronJob('10 * * * * *', () ->
+    getActivity()
+  ).start()
 
