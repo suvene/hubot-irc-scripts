@@ -67,10 +67,11 @@ class Aipo
         $('.messageContents').each((i, elem) =>
           return if dispcnt >= 5
           name = $(elem).find('.name').text()
+          return unless name
           a = $(elem).children().find('.body a')
           #console.log name + a
           return if a.length # 更新通知に表示されてるやつですから飛ばします
-          body = $(elem).find('.body').text().replace(/[ ]+/g, ' ').replace(/[\r\n]+/g, '')
+          body = $(elem).find('.body').text().replace(/[\r\n]+/g, '').replace(/[ ]+/g, ' ')
           text = "#{name}: #{body}"
           # console.log text
           val = text.split(',')
@@ -82,6 +83,37 @@ class Aipo
         while cacheTimelines.length > 100
           cacheTimelines.shift()
         setSenpaiStorage @robot, 'AIPO_TIMELINES', cacheTimelines
+
+        # console.log 'search like'
+        cacheLikeCountMap = getSenpaiStorage @robot, 'AIPO_LIKE_COUNT_MAP'
+        cacheLikeCountMap ||= {}
+        # $(':div[id^=like]').each((i, elem) =>
+        $('div').filter((i, elem) =>
+          id = $(elem).attr('id')
+          return id?.match /^like_[0-9]+/
+        ).each((i, elem) =>
+          id = $(elem).attr('id')
+          count = $(elem).children('a').text()
+          return if count is '0人'
+          count = count.replace /人/g, ''
+          target = $(elem).parent().prev()
+          name = target.find('.name').text()
+          # TODO: コメントのいいねの名前取得したい
+          # name = $(elem).parent().find('.name').text() unless name
+          return unless name
+          body = $(target).find('.body').text().replace(/[\r\n]+/g, '').replace(/[ ]+/g, ' ')
+          text = "#{name}: #{body}"
+          prevCount = cacheLikeCountMap[id] ? 0
+          return if prevCount is count
+          if prevCount < count
+            @send "[Aipoタイムライン]#{text} のイイネがつきました！"
+          else
+            @send "[Aipoタイムライン]#{text} のイイネが削除されました(T-T"
+
+          # console.log 'prev: ' + prevCount + ' cur: ' + count + ' ' + id
+          cacheLikeCountMap[id] = count
+        )
+        setSenpaiStorage @robot, 'AIPO_LIKE_COUNT_MAP', cacheLikeCountMap
 
   send: (msg) ->
     response = new @robot.Response(@robot, {user : {id : -1, name : @room}, text : "none", done : false}, [])
