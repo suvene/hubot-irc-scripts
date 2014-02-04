@@ -16,6 +16,7 @@ query = require('querystring')
 cronJob = require('cron').CronJob
 
 PATH_ACTIVITY = '/portal/media-type/html/user/h_sakaguchi_admin/page/default.psml/js_peid/P-143fe3e7fc1-10a40?action=controls.Maximize'
+PATH_TIMELINE = '/portal/media-type/html/user/h_sakaguchi_admin/page/default.psml/js_peid/P-143fe3e7fc1-10a3f?action=controls.Maximize'
 
 # {{{ SenpaiStorage
 setSenpaiStorage = (robot, key, val) ->
@@ -41,19 +42,46 @@ class Aipo
       @get PATH_ACTIVITY, null, (error, response, $) =>
         cacheActivities = getSenpaiStorage @robot, 'AIPO_ACTIVITIES'
         cacheActivities ||= []
+        dispcnt = 0
         $('.auiRowTable tbody tr').each((i, elem) =>
-          return if i > 5 or i is  0
+          return if dispcnt >= 5 or i is  0
           text = $(elem).text().replace /[\r\n]+/g, ','
           val = text.split(',')
           text = val[2] + ': ' + val[1]
           # a = $(elem).find('a')
           return if text in cacheActivities
           cacheActivities.push text
-          @send "Aipo更新通知 #{text}"
+          @send "[Aipo更新情報] #{text}"
+          dispcnt++
         )
         while cacheActivities.length > 100
           cacheActivities.shift()
-        setSenpaiStorage msg, 'AIPO_ACTIVITIES', cacheActivities
+        setSenpaiStorage @robot, 'AIPO_ACTIVITIES', cacheActivities
+
+  getTimeline: () ->
+    @login (error, response, $) =>
+      @get PATH_TIMELINE, null, (error, response, $) =>
+        cacheTimelines = getSenpaiStorage @robot, 'AIPO_TIMELINES'
+        cacheTimelines ||= []
+        dispcnt = 0
+        $('.messageContents').each((i, elem) =>
+          return if dispcnt >= 5
+          name = $(elem).find('.name').text()
+          a = $(elem).children().find('.body a')
+          #console.log name + a
+          return if a.length # 更新通知に表示されてるやつですから飛ばします
+          body = $(elem).find('.body').text().replace(/[ ]+/g, ' ').replace(/[\r\n]+/g, '')
+          text = "#{name}: #{body}"
+          # console.log text
+          val = text.split(',')
+          return if text in cacheTimelines
+          cacheTimelines.push text
+          @send "[Aipoタイムライン] #{text}"
+          dispcnt++
+        )
+        while cacheTimelines.length > 100
+          cacheTimelines.shift()
+        setSenpaiStorage @robot, 'AIPO_TIMELINES', cacheTimelines
 
   send: (msg) ->
     response = new @robot.Response(@robot, {user : {id : -1, name : @room}, text : "none", done : false}, [])
@@ -107,15 +135,26 @@ class Aipo
 module.exports = (robot) ->
   aipo = new Aipo robot, process.env.HUBOT_AIPO_SEND_ROOM, process.env.HUBOT_AIPO_BASE_URL, process.env.HUBOT_AIPO_USER, process.env.HUBOT_AIPO_PASSWORD
 
+  checkUpdate = () ->
+    getActivity()
+    getTimeline()
+
   getActivity = () ->
-    console.log 'start getActivity!!!'
+#    console.log 'start getActivity!!!'
     aipo.getActivity()
+
+  getTimeline = () ->
+#    console.log 'start getTimeline!!!'
+    aipo.getTimeline()
 
   robot.respond /aipo activity/i, (msg) ->
     getActivity()
 
+  robot.respond /aipo timeline/i, (msg) ->
+    getTimeline()
+
   # *(sec) *(min) *(hour) *(day) *(month) *(day of the week)
-  new cronJob('10 * * * * *', () ->
-    getActivity()
+  new cronJob('*/5 * * * * *', () ->
+    checkUpdate()
   ).start()
 
