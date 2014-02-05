@@ -15,8 +15,8 @@ url = require('url')
 query = require('querystring')
 cronJob = require('cron').CronJob
 
-PATH_ACTIVITY = '/portal/media-type/html/user/h_sakaguchi_admin/page/default.psml/js_peid/P-143fe3e7fc1-10a40?action=controls.Maximize'
-PATH_TIMELINE = '/portal/media-type/html/user/h_sakaguchi_admin/page/default.psml/js_peid/P-143fe3e7fc1-10a3f?action=controls.Maximize'
+PATH_ACTIVITY = process.env.HUBOT_AIPO_ACTIVITY_URL
+PATH_TIMELINE = process.env.HUBOT_AIPO_TIMELINE_URL
 
 # {{{ SenpaiStorage
 setSenpaiStorage = (robot, key, val) ->
