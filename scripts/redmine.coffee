@@ -2,6 +2,7 @@
 #   Redmine
 #
 # Commands:
+#   #99999 - チケットのタイトルとか URL を取ってくるよ.
 #
 # URLS:
 #   None.
@@ -33,14 +34,21 @@ class Redmine # {{{
   constructor: (@robot, @room, @url, @token) ->
     null
 
-  getActivity: () ->
+  Issues: (params, callback) ->
+    @get "/issues.json", params, 'json', callback
+
+  Issue: (id) ->
+    show: (params, callback) =>
+      @get "/issues/#{id}.json", params, 'json', callback
+
+  getActivity: () -> # {{{
     @get PATH_ACTIVITY, null, 'atom', (error, response, feed) =>
       cacheActivities = getSenpaiStorage @robot, 'REDMINE_ACTIVITIES'
       cacheActivities ||= []
       dispcnt = 0
       items = feed.items
 
-      for i, item of items 
+      for i, item of items
         break if dispcnt >= 5
         text = item.author + ': '
         text += item.title
@@ -56,7 +64,9 @@ class Redmine # {{{
       while cacheActivities.length > 100
         cacheActivities.shift()
       setSenpaiStorage @robot, 'REDMINE_ACTIVITIES', cacheActivities
+# }}}
 
+  # Private: do a SEND
   send: (msg) ->
     response = new @robot.Response(@robot, {user : {id : -1, name : @room}, text : "none", done : false}, [])
     # console.log @room + ':' + msg
@@ -131,6 +141,14 @@ module.exports = (robot) ->
 
   # *(sec) *(min) *(hour) *(day) *(month) *(day of the week)
   new cronJob('*/10 * * * * *', () ->
-    checkUpdate()
+#    checkUpdate()
   ).start()
+
+  robot.hear /.*(#(\d+)).*/, (msg) ->
+    id = msg.match[1].replace /#/, ""
+    return if isNaN id
+    redmine.Issue(id).show null, (err, response, data) ->
+      issue = data.issue
+      url = "#{redmine.url}/issues/#{id}"
+      msg.send "#{url} : #{issue.subject} - #{issue.project.name}"
 
