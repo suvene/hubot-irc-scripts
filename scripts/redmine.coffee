@@ -12,7 +12,9 @@
 
 request = require('request')
 URL = require('url')
-query = require('querystring')
+_ = require('underscore');
+url = require('url')
+QUERY = require('querystring')
 cronJob = require('cron').CronJob
 rssparser = require('rssparser')
 
@@ -43,7 +45,22 @@ class Redmine # {{{
 
   Issue: (id) ->
     show: (params, callback) =>
-      @get "/issues/#{id}.json", params, 'json', callback
+      def = {'include': 'children'}
+      params = _.extend(def, params);
+      @get "/issues/#{id}.json", params, 'json', (err, response, data) =>
+        issue = data.issue
+        if issue.children?.length
+          children = []
+          for i, child of issue.children
+            console.log "child[#{i}] : #{child.id}"
+            @Issue(child.id).show null, (err2, response2, childIssue) =>
+              console.log "child[#{i}] : #{childIssue.id}"
+              children.push childIssue
+          issue.children = children
+          callback null, response, issue
+
+  TimeEntry: (issueId, id = null) ->
+    get "/issues/#{id}/time_entiry"
 
   getActivity: () -> # {{{
     @get PATH_ACTIVITY, null, 'atom', (error, response, feed) =>
@@ -78,7 +95,7 @@ class Redmine # {{{
 
   # Private: do a GET request against the API
   get: (path, params, type = 'json', callback) ->
-    path = "#{path}?#{query.stringify params}" if params?
+    path = "#{path}?#{QUERY.stringify params}" if params?
     # console.log 'get: ' + path
     @request "GET", path, null, type, callback
 
@@ -148,8 +165,6 @@ module.exports = (robot) ->
   robot.hear /.*(#(\d+)).*/, (msg) ->
     id = msg.match[1].replace /#/, ""
     return if isNaN id
-    redmine.Issue(id).show null, (err, response, data) ->
-      issue = data.issue
+    redmine.Issue(id).show null, (err, response, issue) ->
       url = "#{redmine.url}/issues/#{id}"
-      msg.send "#{url} : #{issue.subject} - #{issue.project.name}"
-
+      msg.send "#{url} : #{issue.subject}(予: #{issue.estimated_hours}/消: #{}/残: #{}) - #{issue.project.name}"
