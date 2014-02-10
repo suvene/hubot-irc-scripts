@@ -10,9 +10,10 @@
 # Notes:
 #   None.
 
+async = require('async')
 request = require('request')
 URL = require('url')
-_ = require('underscore');
+_ = require('underscore')
 url = require('url')
 QUERY = require('querystring')
 cronJob = require('cron').CronJob
@@ -41,29 +42,40 @@ class Redmine # {{{
     @url = "#{@protocol}//#{@hostname}#{@pathname}"
 
   Issues: (params, callback) ->
-    @get "/issues.json", params, 'json', callback
+    @get "/issues.json", params, {type: "json"}, callback
 
   Issue: (id) ->
-    show: (params, callback) =>
-      def = {'include': 'children'}
-      params = _.extend(def, params);
-      @get "/issues/#{id}.json", params, 'json', (err, response, data) =>
+    # console.log 'issue: ' + id
+    show: (params, callback, opt) =>
+      # console.log 'show: ' + id
+      paramsDef = {include: "children"}
+      params = _.extend(paramsDef, params);
+      optDef =
+        type: "json"
+      opt = _.extend(optDef, opt);
+      @get "/issues/#{id}.json", params, opt, (err, data, response) =>
         issue = data.issue
-        if issue.children?.length
-          children = []
-          for i, child of issue.children
-            console.log "child[#{i}] : #{child.id}"
-            @Issue(child.id).show null, (err2, response2, childIssue) =>
-              console.log "child[#{i}] : #{childIssue.id}"
-              children.push childIssue
-          issue.children = children
-          callback null, response, issue
+        childrenCnt = issue.children?.length || 0
+        if childrenCnt is 0
+          callback null, issue
+        else
+          f = _.object(issue.children.map (child) =>
+            f2 = (cb) =>
+              # console.log 'child' + child.id + ': ' + child.subject
+              @Issue(child.id).show null, cb
+            [child.id, f2])
+
+          async.parallel f, (err, result) ->
+            return if err
+            # console.log result
+            issue.children = (v for k, v of result)
+            callback null, issue
 
   TimeEntry: (issueId, id = null) ->
     get "/issues/#{id}/time_entiry"
 
   getActivity: () -> # {{{
-    @get PATH_ACTIVITY, null, 'atom', (error, response, feed) =>
+    @get PATH_ACTIVITY, null, {type: "atom"}, (error, feed, response) =>
       cacheActivities = getSenpaiStorage @robot, 'REDMINE_ACTIVITIES'
       cacheActivities ||= []
       dispcnt = 0
@@ -87,6 +99,7 @@ class Redmine # {{{
       setSenpaiStorage @robot, 'REDMINE_ACTIVITIES', cacheActivities
 # }}}
 
+  # private send, get, post, put # {{{
   # Private: do a SEND
   send: (msg) ->
     response = new @robot.Response(@robot, {user : {id : -1, name : @room}, text : "none", done : false}, [])
@@ -94,20 +107,26 @@ class Redmine # {{{
     response.send msg
 
   # Private: do a GET request against the API
-  get: (path, params, type = 'json', callback) ->
+  get: (path, params, opt, callback) ->
     path = "#{path}?#{QUERY.stringify params}" if params?
     # console.log 'get: ' + path
-    @request "GET", path, null, type, callback
+    @request "GET", path, null, opt, callback
 
   # Private: do a POST request against the API
-  post: (path, body, type = 'json', callback) ->
-    @request "POST", path, body, type, callback
+  post: (path, body, opt, callback) ->
+    @request "POST", path, body, opt, callback
 
   # Private: do a PUT request against the API
-  put: (path, body, callback) ->
-    @request "PUT", path, body, null, callback
+  put: (path, body, opt, callback) ->
+    @request "PUT", path, body, opt, callback
+# }}}
 
-  request: (method, path, body, type, callback) ->
+  # private request # {{{
+  request: (method, path, body, opt, callback) ->
+    optDefault =
+      "type": "json"
+    opt = _.extend(optDefault, opt)
+
     headers =
       "Content-Type": "application/json"
       "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36"
@@ -117,7 +136,7 @@ class Redmine # {{{
       "url"   : "#{@url}#{path}"
       "method" : method
       "headers": headers
-      "timeout": 2000
+      "timeout": 10000
       "strictSSL": false
 
     if method in ["POST", "PUT"]
@@ -130,19 +149,21 @@ class Redmine # {{{
     request options, (error, response, data) ->
       if !error and response?.statusCode is 200
         try
-          if type is 'json'
-            callback null, response, JSON.parse(data)
-          else if type is 'atom'
+          if opt.type is 'json'
+            callback null, JSON.parse(data), response
+          else if opt.type is 'atom'
             rssparser.parseString data, {}, (err, feed) ->
               # console.log feed
-              callback err, response, feed
+              callback err, feed, response
         catch err
-          callback null, response, (data or { })
+          callback null, (data or { }), response
       else
         console.log 'error: ' + response?.statusCode
         console.log error
         @send "Redmine がなんかエラーやわ"
-# }}}
+        callback error, null, response
+  # /private request }}}
+# /Redmine }}}
 
 module.exports = (robot) ->
   redmine = new Redmine robot, process.env.HUBOT_REDMINE_SEND_ROOM, process.env.HUBOT_REDMINE_BASE_URL, process.env.HUBOT_REDMINE_TOKEN
@@ -165,6 +186,12 @@ module.exports = (robot) ->
   robot.hear /.*(#(\d+)).*/, (msg) ->
     id = msg.match[1].replace /#/, ""
     return if isNaN id
-    redmine.Issue(id).show null, (err, response, issue) ->
+    redmine.Issue(id).show null, (err, issue, response) ->
+      # console.log issue.children
       url = "#{redmine.url}/issues/#{id}"
-      msg.send "#{url} : #{issue.subject}(予: #{issue.estimated_hours}/消: #{}/残: #{}) - #{issue.project.name}"
+      estimated_hours = issue.estimated_hours || 0
+      spent_hours = issue.spent_hours || 0
+      for i, v of issue.children
+        spent_hours += v.spent_hours || 0
+      msg.send "#{url} : #{issue.subject}(予: #{estimated_hours}h / 消: #{spent_hours}h) - #{issue.project.name}"
+
