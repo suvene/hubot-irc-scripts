@@ -49,6 +49,7 @@ COUNT_MINUS = [
 
 # {{{ existsUser
 existsUser = (robot, msg, name) ->
+  name = name.toLowerCase()
   return true if name is robot.name
   users = robot.brain.data.usersInfo ||= {}
   for u, v of users
@@ -71,6 +72,7 @@ getSenpaiStorage = (robot, msg, key) ->
 
 # {{{ UserInfo
 setUserInfo = (robot, msg, name, key, val) ->
+  name = name.toLowerCase()
   return null unless existsUser robot, msg, name
   usersInfo = robot.brain.data.usersInfo ||= {}
   usersInfo[name] ||= {}
@@ -79,6 +81,7 @@ setUserInfo = (robot, msg, name, key, val) ->
   robot.brain.data.usersInfo = usersInfo
 
 getUserInfo = (robot, msg, name, key) ->
+  name = name.toLowerCase()
   return null unless existsUser robot, msg, name
   usersInfo = robot.brain.data.usersInfo ||= {}
   usersInfo[name] ||= {}
@@ -86,6 +89,7 @@ getUserInfo = (robot, msg, name, key) ->
 # }}}
 
 whoIsThis = (robot, msg, name) -># {{{
+  name = name.toLowerCase()
   return name if existsUser robot, msg, name
   gNicknames = getSenpaiStorage robot, msg, 'NICKNAMES'
   gNicknames ||= {}
@@ -236,7 +240,7 @@ module.exports = (robot) ->
 # }}}
 
   robot.respond /([^ ]+)[ ]*の(あだ|アダ)名は?(何|なん|なに)/, (msg) -># {{{
-    realname = msg.match[1]
+    realname = msg.match[1].toLowerCase()
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
       checkKeigo robot, msg
@@ -260,8 +264,8 @@ module.exports = (robot) ->
 
   robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*(って|と)呼ばれ/, (msg) -># {{{
     return if msg.message.match('ない|ません')
-    realname = msg.match[1]
-    nickname = msg.match[2]
+    realname = msg.match[1].toLowerCase()
+    nickname = msg.match[2].toLowerCase()
     nickname = trimKeisho nickname
     unless existsUser robot, msg, realname
       msg.send "#{realname} って誰？"
@@ -294,8 +298,8 @@ module.exports = (robot) ->
 # }}}
 
   robot.respond /([^ ]+)[ ]*は[ ]*([^ ]+)[ ]*(って|と)呼ばれて(ない|ませ)/, (msg) -># {{{
-    realname = msg.match[1]
-    nickname = msg.match[2]
+    realname = msg.match[1].toLowerCase()
+    nickname = msg.match[2].toLowerCase()
     nickname = trimKeisho nickname
     unless existsUser robot, msg, realname
       msg.send "そもそも #{realname} って誰?"
