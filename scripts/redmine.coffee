@@ -11,7 +11,7 @@
 #   None.
 
 request = require('request')
-url = require('url')
+URL = require('url')
 query = require('querystring')
 cronJob = require('cron').CronJob
 rssparser = require('rssparser')
@@ -32,7 +32,11 @@ getSenpaiStorage = (robot, key) ->
 
 class Redmine # {{{
   constructor: (@robot, @room, @url, @token) ->
-    null
+    endpoint = URL.parse(@url)
+    @protocol = endpoint.protocol
+    @hostname = endpoint.hostname
+    @pathname = endpoint.pathname.replace /^\/$/, ''
+    @url = "#{@protocol}//#{@hostname}#{@pathname}"
 
   Issues: (params, callback) ->
     @get "/issues.json", params, 'json', callback
@@ -92,11 +96,8 @@ class Redmine # {{{
       "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36"
       "X-Redmine-API-Key": @token
 
-    endpoint = url.parse(@url)
-    pathname = endpoint.pathname.replace /^\/$/, ''
-
     options =
-      "url"   : "#{endpoint.protocol}//#{endpoint.hostname}#{pathname}#{path}"
+      "url"   : "#{@url}#{path}"
       "method" : method
       "headers": headers
       "timeout": 2000
@@ -141,7 +142,7 @@ module.exports = (robot) ->
 
   # *(sec) *(min) *(hour) *(day) *(month) *(day of the week)
   new cronJob('*/10 * * * * *', () ->
-#    checkUpdate()
+    checkUpdate()
   ).start()
 
   robot.hear /.*(#(\d+)).*/, (msg) ->

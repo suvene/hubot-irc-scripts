@@ -11,7 +11,7 @@
 
 request = require('request')
 cheerio = require('cheerio')
-url = require('url')
+URL = require('url')
 query = require('querystring')
 cronJob = require('cron').CronJob
 
@@ -33,6 +33,11 @@ getSenpaiStorage = (robot, key) ->
 class Aipo
   constructor: (@robot, @room, @url, @user, @pass) ->
     @jar = request.jar()
+    endpoint = URL.parse(@url)
+    @protocol = endpoint.protocol
+    @hostname = endpoint.hostname
+    @pathname = endpoint.pathname.replace /^\/$/, ''
+    @url = "#{@protocol}//#{@hostname}#{@pathname}"
 
   login: (callback) ->
     @get "/", {username: @user, password: @pass}, callback
@@ -139,14 +144,11 @@ class Aipo
       "Content-Type": "application/json"
       "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36"
 
-    endpoint = url.parse(@url)
-    pathname = endpoint.pathname.replace /^\/$/, ''
-
     options =
 #      "host"   : endpoint.hostname
 #      "port"   : endpoint.port
 #      "path"   : "#{pathname}#{path}"
-      "url"   : "#{endpoint.protocol}//#{endpoint.hostname}#{pathname}#{path}"
+      "url"   : "#{@url}#{path}"
       "method" : method
       "headers": headers
       "timeout": 2000
