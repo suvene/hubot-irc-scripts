@@ -33,6 +33,14 @@ getSenpaiStorage = (robot, key) ->
   storage[key]
 # }}}
 
+whoIsThis = (robot, msg, name) -> # {{{
+  return name if existsUser robot, msg, name
+  gNicknames = getSenpaiStorage robot, msg, 'NICKNAMES'
+  gNicknames ||= {}
+  return gNicknames[name] if gNicknames[name]
+  return null
+# }}}
+
 class Redmine # {{{
   constructor: (@robot, @room, @url, @token) ->
     endpoint = URL.parse(@url)
@@ -194,4 +202,9 @@ module.exports = (robot) ->
       for i, v of issue.children
         spent_hours += v.spent_hours || 0
       msg.send "#{url} : #{issue.subject}(予: #{estimated_hours}h / 消: #{spent_hours}h) - #{issue.project.name}"
+
+  robot.respond /(.+).*は誰?/, (msg) ->
+    name = msg.match[1]
+    user = whoIsThis name
+    msg.send user
 

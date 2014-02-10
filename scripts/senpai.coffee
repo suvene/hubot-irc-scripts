@@ -104,7 +104,7 @@ trimKeigo = (str) ->
 
 checkKeigo = (robot, msg) =>
   unless isKeigo robot, msg
-    msg.send msg.random NANDE_TAMEGUCHI if Math.random 0 < 0.1
+    msg.send msg.random NANDE_TAMEGUCHI if (Math.random 0) < 0.1
 # }}}
 
 # {{{ Keisho
