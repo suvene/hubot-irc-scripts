@@ -13,6 +13,8 @@
 #   {アダ名 or nickname}--  - ヨクナイネ！
 #   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
 
+_ = require('underscore')
+
 # {{{ AISATSU
 AISATSU_YOROSHIKU = [
   'よろしくな'
@@ -326,7 +328,7 @@ module.exports = (robot) ->
 
     gNicknames[nickname] = null
     setSenpaiStorage robot, msg, 'NICKNAMES', gNicknames
-    newNicknames = (item for item in nicknames when item isnt nickname)
+    newNicknames = (item for item in nicknames when item.toLowerCase() isnt nickname)
     setUserInfo robot, msg, realname, 'NICKNAMES', newNicknames
     checkKeigo robot, msg
 # }}}
@@ -335,8 +337,8 @@ module.exports = (robot) ->
   robot.hear /([^ ]+)(\+\+[ ]*(.*))/i, (msg) ->
     fromname = msg.message.user.name
     fromuser = whoIsThis robot, msg, fromname
-    unless whoIsThis robot, msg, fromuser
-      msg.send "#{fromuser} こいつ誰？ > all"
+    unless fromuser
+      msg.send "#{fromname} こいつ誰？ > all"
       checkKeigo robot, msg
       return
 
@@ -376,8 +378,8 @@ module.exports = (robot) ->
   robot.hear /([^ ]+)(--[ ]*(.*))/i, (msg) ->
     fromname = msg.message.user.name
     fromuser = whoIsThis robot, msg, fromname
-    unless whoIsThis robot, msg, fromuser
-      msg.send "#{fromuser} こいつ誰？ > all"
+    unless fromuser
+      msg.send "#{fromname} こいつ誰？ > all"
       checkKeigo robot, msg
       return
 
@@ -429,7 +431,35 @@ module.exports = (robot) ->
     checkKeigo robot, msg
 # }}}
 
+  # cace sensitive
+  robot.respond /([^ ]+)[ ]*→[ ]*([^ ]+)/i, (msg) ->
+    fromname = msg.match[1]
+    toname = msg.match[2]
+
+    return msg.send "それだめ" if fromname.toLowerCase() is robot.name
+    # return msg.send "#{fromname} がいない" unless existsUser robot, msg, fromname
+    return msg.send "#{toname} はすでにいる" if whoIsThis robot, msg, toname
+
+    usersInfo = robot.brain.data.usersInfo ||= {}
+    newUsersInfo = {}
+    console.log usersInfo
+    for k, v of usersInfo
+      if k is fromname
+        k = toname
+      newUsersInfo[k] = _.clone(v)
+    console.log newUsersInfo
+    robot.brain.data.usersInfo = newUsersInfo
+
+    gNicknames = getSenpaiStorage robot, msg, 'NICKNAMES'
+    gNicknames ||= {}
+    newNicknames = {}
+    console.log gNicknames
+    robot.brain.data.usersInfo = newUsersInfo
+    for k, v of gNicknames
+      newNicknames[k] = v?.replace new RegExp('^' + fromname + '$'), toname
+    console.log newNicknames
+    setSenpaiStorage robot, msg, 'NICKNAMES', newNicknames
+
   robot.respond /DIE$/i, (msg) ->
-    msg.send "どうやら俺の人生もここまでだ。みん元気でな"
     process.exit 0
 
