@@ -3,6 +3,7 @@
 #
 # Commands:
 #   #99999 - チケットのタイトルとか URL を取ってくるよ.
+#   hubot redmine (みんな|<nickname[,nickname]>) の実績
 #
 # URLS:
 #   None.
@@ -18,6 +19,7 @@ url = require('url')
 QUERY = require('querystring')
 cronJob = require('cron').CronJob
 rssparser = require('rssparser')
+DateUtil = require('date-utils')
 
 PATH_ACTIVITY = process.env.HUBOT_REDMINE_ACTIVITY_URL
 
@@ -33,12 +35,47 @@ getSenpaiStorage = (robot, key) ->
   storage[key]
 # }}}
 
-whoIsThis = (robot, msg, name) -> # {{{
-  return name if existsUser robot, msg, name
-  gNicknames = getSenpaiStorage robot, msg, 'NICKNAMES'
+# {{{ existsUser
+existsUser = (robot, name) ->
+  name = name.toLowerCase()
+  return true if name is robot.name
+  users = robot.brain.data.usersInfo ||= {}
+  for u, v of users
+    if u is name
+      return true
+  return false
+# }}}
+
+whoIsThis = (robot, name) -> # {{{
+  name = name.toLowerCase()
+  return name if existsUser robot, name
+  gNicknames = getSenpaiStorage robot, 'NICKNAMES'
   gNicknames ||= {}
   return gNicknames[name] if gNicknames[name]
   return null
+# }}}
+
+# tries to resolve ambiguous users by matching login or firstname# {{{
+# redmine's user search is pretty broad (using login/name/email/etc.) so
+# we're trying to just pull it in a bit and get a single user
+#
+# name - this should be the name you're trying to match
+# data - this is the array of users from redmine
+#
+# returns an array with a single user, or the original array if nothing matched
+resolveUsers = (name, data) ->
+    name = name.toLowerCase();
+
+    # try matching login
+    found = data.filter (user) -> user.login.toLowerCase() == name
+    return found if found.length == 1
+
+    # try first name
+    found = data.filter (user) -> user.firstname.toLowerCase() == name
+    return found if found.length == 1
+
+    # give up
+    data
 # }}}
 
 class Redmine # {{{
@@ -49,8 +86,11 @@ class Redmine # {{{
     @pathname = endpoint.pathname.replace /^\/$/, ''
     @url = "#{@protocol}//#{@hostname}#{@pathname}"
 
-  Issues: (params, callback) ->
-    @get "/issues.json", params, {type: "json"}, callback
+  Users: (params, callback, opt) ->
+    @get "/users.json", params, opt, callback
+
+  Issues: (params, callback, opt) ->
+    @get "/issues.json", params, opt, callback
 
   Issue: (id) ->
     # console.log 'issue: ' + id
@@ -58,9 +98,6 @@ class Redmine # {{{
       # console.log 'show: ' + id
       paramsDef = {include: "children"}
       params = _.extend(paramsDef, params);
-      optDef =
-        type: "json"
-      opt = _.extend(optDef, opt);
       @get "/issues/#{id}.json", params, opt, (err, data, response) =>
         issue = data.issue
         childrenCnt = issue.children?.length || 0
@@ -74,13 +111,21 @@ class Redmine # {{{
             [child.id, f2])
 
           async.parallel f, (err, result) ->
-            return if err
+            return callback err, null if err or result is null
             # console.log result
             issue.children = (v for k, v of result)
             callback null, issue
 
-  TimeEntry: (issueId, id = null) ->
-    get "/issues/#{id}/time_entiry"
+  TimeEntry: () ->
+    get: (params, callback, opt) =>
+      paramsDefault =
+        from:  Date.yesterday().toFormat('YYYY-MM-DD')
+        to:  Date.yesterday().toFormat('YYYY-MM-DD')
+      params = _.extend(paramsDefault, params);
+      @get "/time_entries.json", params, opt, (err, data, response) =>
+        return callback err, null if err or data is null
+        timeEntries = data.time_entries
+        callback null, timeEntries
 
   getActivity: () -> # {{{
     @get PATH_ACTIVITY, null, {type: "atom"}, (error, feed, response) =>
@@ -154,22 +199,22 @@ class Redmine # {{{
       options.headers["Content-Length"] = body.length
 
     # console.log options.url
-    request options, (error, response, data) ->
-      if !error and response?.statusCode is 200
+    request options, (err, response, data) ->
+      if !err and response?.statusCode is 200
         try
           if opt.type is 'json'
             callback null, JSON.parse(data), response
           else if opt.type is 'atom'
-            rssparser.parseString data, {}, (err, feed) ->
+            rssparser.parseString data, {}, (error, feed) ->
               # console.log feed
-              callback err, feed, response
-        catch err
+              callback error, feed, response
+        catch err2
           callback null, (data or { }), response
       else
-        console.log 'error: ' + response?.statusCode
-        console.log error
-        @send "Redmine がなんかエラーやわ"
-        callback error, null, response
+        console.log 'error: ' + response?.statusCode + ', url =>' + options.url
+        console.log err ||= response?.statusCode
+        #@send "Redmine がなんかエラーやわ"
+        callback err, null, response
   # /private request }}}
 # /Redmine }}}
 
@@ -194,7 +239,8 @@ module.exports = (robot) ->
   robot.hear /.*(#(\d+)).*/, (msg) ->
     id = msg.match[1].replace /#/, ""
     return if isNaN id
-    redmine.Issue(id).show null, (err, issue, response) ->
+    redmine.Issue(id).show null, (err, issue) ->
+      return msg.send 'Error!: ' + err if err or issue is null
       # console.log issue.children
       url = "#{redmine.url}/issues/#{id}"
       estimated_hours = issue.estimated_hours || 0
@@ -203,8 +249,51 @@ module.exports = (robot) ->
         spent_hours += v.spent_hours || 0
       msg.send "#{url} : #{issue.subject}(予: #{estimated_hours}h / 消: #{spent_hours}h) - #{issue.project.name}"
 
-  robot.respond /(.+).*は誰?/, (msg) ->
-    name = msg.match[1]
-    user = whoIsThis name
-    msg.send user
+  robot.respond /redmine[\s]+([\S]*)[\s]*実績(詳細)?/, (msg) ->
+    command = msg.match[1]
+    params =
+      from:  Date.yesterday().toFormat('YYYY-MM-DD')
+      to:  Date.yesterday().toFormat('YYYY-MM-DD')
+    isDetail = true if msg.match[2]
+
+    redmine.TimeEntry().get params, (err, timeEntries) ->
+      return msg.send 'Error!: ' + err if err or timeEntries is null
+      return msg.send "誰も実績入れてません!" unless timeEntries.length
+      messages = {}
+      for k, v of timeEntries
+        id = v.user.id
+        messages[id] ||=
+          name: v.user.name
+          hours: 0
+        messages[id].hours += v.hours
+        if isDetail
+          messages[id].issues ||= {}
+          messages[id].issues[v.issue.id] ||=
+            hours: 0
+            comments: ''
+          messages[id].issues[v.issue.id].hours += v.hours
+          if v.comments
+            messages[id].issues[v.issue.id].comments += ',' if messages[id].issues[v.issue.id].comments
+            messages[id].issues[v.issue.id].comments += v.comments
+
+      reply = "#{params.from} 〜 #{params.to} の実績\n"
+      for id, m of messages
+         reply += "#{m.name}: #{m.hours}h\n"
+         if isDetail
+           for issueId, issue of m.issues
+             reply += "  ##{issueId}: #{issue.hours}h #{issue.comments}\n"
+      msg.send reply
+
+
+#    userName = msg.match[1].toLowerCase()
+#    user = whoIsThis robot, userName
+#
+#    redmine.Users name:user, (err, data) ->
+#      # console.log 'count:' + userName + ' ' + data.total_count
+#      unless data.total_count > 0
+#        msg.reply "\"#{userName}\" が redmine で見つけられない"
+#        return false
+#
+#      user = resolveUsers(user, data.users)[0]
+#      console.log user
 
