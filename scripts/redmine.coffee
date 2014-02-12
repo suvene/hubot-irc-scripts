@@ -6,7 +6,7 @@
 #   hubot redmine (みんな|<nickname[,nickname]>) の実績[詳細] - 前営業日の実績を教えてもらおう！
 #   hubot redmine 実績チェック - 前営業日の実績をチェックするよ！
 #   hubot redmine <nickname> 実績チェック(する|しない) - 実績チェックの対象、または対象外にするよ！
-#   hubot redmine [yyyy-mm-dd] <#9999> 99[.99](h|時間) <活動> [コメント]- 実績を登録しよう！(日付省略時は前営業日になるよ) 例) hubot redmine #41 1.25h 製造 働いたよ!
+#   hubot redmine [yyyy-mm-dd] <#9999> 99[.25](h|時間) <活動> [コメント]- 実績を登録しよう！(日付省略時は前営業日になるよ) 例) hubot redmine #41 1.25h 製造 働いたよ!
 #
 # URLS:
 #   None.
@@ -350,7 +350,7 @@ module.exports = (robot) ->
     checkUpdate()
   ).start()
 
-  new cronJob('0 10 9,12,15,18 * * *', () ->
+  new cronJob('0 15 9,12,15,18 * * *', () ->
     date = getPrevKadobi(robot, Date.yesterday())
     checkJisseki(date)
   ).start()

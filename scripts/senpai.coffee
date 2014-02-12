@@ -3,16 +3,16 @@
 #
 # Commands:
 #   hubot よろしくお願いします！ - hubot に挨拶しよう！
-#   hubot 後輩の {nickname} - hubot に面通ししよう！
+#   hubot 後輩の <nickname> - hubot に面通ししよう！
 #   hubot 誰知ってるんですか? - hubot が知ってる人を教えてくれるよ！
-#   hubot {アダ名 or nickname} って誰ですか？ - 誰かよくわからない場合は hubot に聞いてみよう！
-#   hubot {nickname} のアダ名何ですか?  - ものしりな hubot にアダ名を教えてもらおう！
-#   hubot {nickname} は {アダ名} って呼ばれてます - hubot にアダ名を教えるよ！
-#   hubot {nickname} は {アダ名} って呼ばれてないです  - hubot にアダ名が間違いだったことを教えるよ！
-#   {アダ名 or nickname}++  - イイネ！
-#   {アダ名 or nickname}--  - ヨクナイネ！
-#   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
-#   hubot 設定 <yyyy-mm-dd> は休日(じゃない) - 先輩に出勤日を教えよう!
+#   hubot (アダ名|nickname) って誰ですか？ - 誰かよくわからない場合は hubot に聞いてみよう！
+#   hubot <nickname> のアダ名何ですか?  - ものしりな hubot にアダ名を教えてもらおう！
+#   hubot <nickname> は <アダ名> って呼ばれてます - hubot にアダ名を教えるよ！
+#   hubot <nickname> は <アダ名> って呼ばれてないです  - hubot にアダ名が間違いだったことを教えるよ！
+#   (アダ名|nickname)++ [イイネ！のコメント] - イイネ！
+#   (アダ名|nickname}-- [ヨクナイね！のコメント] - ヨクナイネ！
+#   hubot (アダ名|nickname) 何点ですか?  - hubot に後輩の点数を教えてもらおう!
+#   hubot 設定 <yyyy-mm-dd> は休日[じゃない]- 先輩に出勤日を教えよう!
 
 _ = require('underscore')
 DateUtil = require('date-utils')
