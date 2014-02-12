@@ -6,6 +6,7 @@
 #   hubot redmine (みんな|<nickname[,nickname]>) の実績[詳細] - 前営業日の実績を教えてもらおう！
 #   hubot redmine 実績チェック - 前営業日の実績をチェックするよ！
 #   hubot redmine <nickname> 実績チェック(する|しない) - 実績チェックの対象、または対象外にするよ！
+#   hubot redmine [yyyy-mm-dd] <#9999> 99[.99](h|時間) <活動> [コメント]- 実績を登録しよう！(日付省略時は前営業日になるよ) 例) hubot redmine #41 1.25h 製造 働いたよ!
 #
 # URLS:
 #   None.
@@ -13,14 +14,13 @@
 # Notes:
 #   None.
 
-async = require('async')
-request = require('request')
 URL = require('url')
-_ = require('underscore')
-url = require('url')
 QUERY = require('querystring')
-cronJob = require('cron').CronJob
+request = require('request')
+async = require('async')
 rssparser = require('rssparser')
+cronJob = require('cron').CronJob
+_ = require('underscore')
 DateUtil = require('date-utils')
 
 PATH_ACTIVITY = process.env.HUBOT_REDMINE_ACTIVITY_URL
@@ -84,6 +84,36 @@ getPrevKadobi = (robot, date) -> # {{{
       continue
     break
   return date
+# }}}
+
+getActivityId = (activity) -> # {{{
+  return 8 if activity.match /要件定義/
+  return 9 if activity.match /製造/
+  return 10 if activity.match /管理/
+  return 11 if activity.match /結テ仕/
+  return 12 if activity.match /調査/
+  return 13 if activity.match /見積/
+  return 14 if activity.match /リリース/
+  return 15 if activity.match /ヒアリング/
+  return 16 if activity.match /開発環境/
+  return 17 if activity.match /オペマニ/
+  return 18 if activity.match /営業/
+  return 24 if activity.match /社内手続き/
+  return 25 if activity.match /現状分析/
+  return 26 if activity.match /教育/
+  return 27 if activity.match /社内環境/
+  return 28 if activity.match /業務外作業/
+  return 29 if activity.match /引継/
+  return 30 if activity.match /土曜出勤/
+  return 31 if activity.match /提案活動/
+  return 32 if activity.match /単テ仕/
+  return 33 if activity.match /単テ実/
+  return 34 if activity.match /基本設計/
+  return 35 if activity.match /詳細設計/
+  return 37 if activity.match /結テ実/
+  return 38 if activity.match /PMO/
+  return 39 if activity.match /ユーザー環境/
+  return null
 # }}}
 
 # tries to resolve ambiguous users by matching login or firstname# {{{
@@ -161,6 +191,9 @@ class Redmine # {{{
         return callback err, null if err or data is null
         timeEntries = data.time_entries
         callback null, timeEntries
+
+    create: (attributes, callback, opt) =>
+      @post "/time_entries.json", {time_entry: attributes}, opt, callback
 # }}}
 
   getActivity: () -> # {{{
@@ -272,26 +305,26 @@ class Redmine # {{{
     if method in ["POST", "PUT"]
       if typeof(body) isnt "string"
         body = JSON.stringify body
-
-      options.headers["Content-Length"] = body.length
+      options.body = body
+      # options.headers["Content-Length"] = body.length
 
     # console.log options.url
     request options, (err, response, data) ->
       if !err and response?.statusCode is 200
+        parsedData = data
         try
-          if opt.type is 'json'
-            callback null, JSON.parse(data), response
-          else if opt.type is 'atom'
-            rssparser.parseString data, {}, (error, feed) ->
-              # console.log feed
-              callback error, feed, response
-        catch err2
-          callback null, (data or { }), response
+          parsedData = JSON.parse(data)
+
+        if opt.type is 'json'
+          callback null, (parsedData or { }), response
+        else if opt.type is 'atom'
+          rssparser.parseString data, {}, (error, feed) ->
+            # console.log feed
+            callback error, feed, response
       else
-        console.log 'error: ' + response?.statusCode + ', url =>' + options.url
+        console.log 'code: ' + response?.statusCode + ', url =>' + options.url
         console.log err ||= response?.statusCode
-        #@send "Redmine がなんかエラーやわ"
-        callback err, null, response
+        callback err, data, response
   # /private request }}}
 # /Redmine }}}
 
@@ -390,15 +423,49 @@ module.exports = (robot) ->
       msg.send reply
   # }}}
 
-#    userName = msg.match[1].toLowerCase()
-#    user = whoIsThis robot, userName
-#
-#    redmine.Users name:user, (err, data) ->
-#      # console.log 'count:' + userName + ' ' + data.total_count
-#      unless data.total_count > 0
-#        msg.reply "\"#{userName}\" が redmine で見つけられない"
-#        return false
-#
-#      user = resolveUsers(user, data.users)[0]
-#      console.log user
+  robot.respond /redmine[\s]+(\d{2,4}(?:-|\/)\d{1,2}(?:-|\/)\d{1,2}[\s]+)?#(\d+)[\s]+(\d{1,2}(\.00?|\.25|\.50?|.75)?)[\s]*(?:h|時間)[\s]+([\S]+)(?:[\s]+"?([^"]+)"?)?/i, (msg) -> # {{{
+    userName = msg.message.user.name
+    user = whoIsThis robot, userName
+    return msg.send "誰？" unless user
+
+    [date, id, hours, hoursshosu, activity, userComments] = msg.match[1..6]
+    if date
+      date = new Date date
+      return msg.send "#{date} は日付じゃない" unless Date.validateDay(date.getDate(), date.getFullYear(), date.getMonth())
+    else
+      date = getPrevKadobi robot, Date.yesterday()
+    dateYMD = date.toYMD()
+    console.log dateYMD
+
+    if userComments?
+      comments = "#{msg.message.user.name}: #{userComments}"
+    else
+      comments = "Time logged by: #{msg.message.user.name}"
+    activityId = getActivityId activity
+    unless activityId
+      msg.reply "こんな\"活動\"はない > #{activity}\n"
+      msg.send " Usage: #{robot.name} redmine ##{id} #{hours}h 製造 #{activity}"
+      return
+
+    redmine.Users name:user, (err, data) =>
+      # console.log 'count:' + userName + ' ' + data.total_count
+      unless data.total_count > 0
+        msg.send "\"#{user}\" が redmine で見つけられない"
+        return false
+      redmineUser = resolveUsers(user, data.users)[0]
+
+      attributes =
+        issue_id: id
+        spent_on: dateYMD
+        hours: hours
+        comments: comments
+        user_id: redmineUser.id
+        activity_id: activityId
+
+      redmine.TimeEntry().create attributes, (error, data, response) ->
+        if response?.statusCode == 201
+          msg.reply "よく頑張りました！(#{dateYMD} で登録)"
+        else
+          msg.reply "なんか失敗"
+# }}}
 
