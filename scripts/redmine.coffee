@@ -3,7 +3,9 @@
 #
 # Commands:
 #   #99999 - チケットのタイトルとか URL を取ってくるよ.
-#   hubot redmine (みんな|<nickname[,nickname]>) の実績
+#   hubot redmine (みんな|<nickname[,nickname]>) の実績[詳細] - 前営業日の実績を教えてもらおう！
+#   hubot redmine 実績チェック - 前営業日の実績をチェックするよ！
+#   hubot redmine <nickname> 実績チェック(する|しない) - 実績チェックの対象、または対象外にするよ！
 #
 # URLS:
 #   None.
@@ -55,6 +57,35 @@ whoIsThis = (robot, name) -> # {{{
   return null
 # }}}
 
+# {{{ UserInfo
+setUserInfo = (robot, name, key, val) ->
+  name = name.toLowerCase()
+  return null unless existsUser robot, name
+  usersInfo = robot.brain.data.usersInfo ||= {}
+  usersInfo[name] ||= {}
+  usersInfo[name][key] = val
+  robot.brain.data.usersInfo = usersInfo
+
+getUserInfo = (robot, name, key) ->
+  name = name.toLowerCase()
+  return null unless existsUser robot, name
+  usersInfo = robot.brain.data.usersInfo ||= {}
+  usersInfo[name] ||= {}
+  usersInfo[name][key]
+# }}}
+
+getPrevKadobi = (robot, date) -> # {{{
+  # console.log 'getPrevKadobi: ' + date.toYMD()
+  loop
+    week = date.getDay()
+    gHolidays = getSenpaiStorage robot, 'HOLIDAYS'
+    if week is 6 or week is 7 or gHolidays[date.toYMD()]
+      date = date.addDays(-1)
+      continue
+    break
+  return date
+# }}}
+
 # tries to resolve ambiguous users by matching login or firstname# {{{
 # redmine's user search is pretty broad (using login/name/email/etc.) so
 # we're trying to just pull it in a bit and get a single user
@@ -79,17 +110,19 @@ resolveUsers = (name, data) ->
 # }}}
 
 class Redmine # {{{
-  constructor: (@robot, @room, @url, @token) ->
+  constructor: (@robot, @room, @url, @token) -> # {{{
     endpoint = URL.parse(@url)
     @protocol = endpoint.protocol
     @hostname = endpoint.hostname
     @pathname = endpoint.pathname.replace /^\/$/, ''
     @url = "#{@protocol}//#{@hostname}#{@pathname}"
+  # }}}
 
-  Users: (params, callback, opt) ->
+  Users: (params, callback, opt) -> # {{{
     @get "/users.json", params, opt, callback
+# }}}
 
-  Issues: (params, callback, opt) ->
+  Issues: (params, callback, opt) -> # {{{
     @get "/issues.json", params, opt, callback
 
   Issue: (id) ->
@@ -115,9 +148,11 @@ class Redmine # {{{
             # console.log result
             issue.children = (v for k, v of result)
             callback null, issue
+  # }}}
 
-  TimeEntry: () ->
+  TimeEntry: () -> # {{{
     get: (params, callback, opt) =>
+      console.log 'TimeEntry#get'
       paramsDefault =
         from:  Date.yesterday().toFormat('YYYY-MM-DD')
         to:  Date.yesterday().toFormat('YYYY-MM-DD')
@@ -126,6 +161,7 @@ class Redmine # {{{
         return callback err, null if err or data is null
         timeEntries = data.time_entries
         callback null, timeEntries
+# }}}
 
   getActivity: () -> # {{{
     @get PATH_ACTIVITY, null, {type: "atom"}, (error, feed, response) =>
@@ -151,6 +187,47 @@ class Redmine # {{{
         cacheActivities.shift()
       setSenpaiStorage @robot, 'REDMINE_ACTIVITIES', cacheActivities
 # }}}
+
+  checkJisseki: (date) -> # {{{
+    console.log 'checkJisseki'
+    usersInfo = @robot.brain.data.usersInfo ||= {}
+    users = {}
+    userCnt = 0
+    for u, v of usersInfo
+      continue if v['IS_NOT_CHECK_JISSEKI'] or u is @robot.name
+      userCnt++
+      console.log "check user: #{u}"
+      users[u] =
+        errNoInput: true
+        warnNoActivity: false
+    return unless userCnt
+
+    params =
+      from: date.toYMD()
+      to: date.toYMD()
+
+    @TimeEntry().get params, (err, timeEntries) =>
+      @send 'Error!: ' + err if err or timeEntries is null
+      for k, v of timeEntries
+        name = whoIsThis @robot, v.user.name
+        unless name
+          name = v.user.name
+          users[name] = {}
+          users[name].warnWho = true
+        users[name]?.errNoInput = false if users[name]?.errNoInput
+        users[name]?.warnNoActivity = true if v.activity.name is '【設定してください】'
+
+      reply = "#{params.from} の実績チェック\n"
+      for k, v of users
+        if v.errNoInput or v.warnNoActivity or v.warnWho
+          reply += "#{k}: "
+          reply += "<だれかわからない>" if v.warnWho
+          reply += "<実績入力なし>" if v.errNoInput
+          reply += "<活動が設定されてない実績あり>" if v.warnNoActivity
+          reply += "\n"
+
+      @send reply
+  # }}}
 
   # private send, get, post, put # {{{
   # Private: do a SEND
@@ -221,6 +298,7 @@ class Redmine # {{{
 module.exports = (robot) ->
   redmine = new Redmine robot, process.env.HUBOT_REDMINE_SEND_ROOM, process.env.HUBOT_REDMINE_BASE_URL, process.env.HUBOT_REDMINE_TOKEN
 
+  # {{{ for cron
   checkUpdate = () ->
     getActivity()
 
@@ -231,12 +309,36 @@ module.exports = (robot) ->
   robot.respond /redmine activity/i, (msg) ->
     getActivity()
 
+  checkJisseki = (date) ->
+    redmine.checkJisseki(date)
+
   # *(sec) *(min) *(hour) *(day) *(month) *(day of the week)
   new cronJob('*/10 * * * * *', () ->
     checkUpdate()
   ).start()
 
-  robot.hear /.*(#(\d+)).*/, (msg) ->
+  new cronJob('0 10 9,12,15,18 * * *', () ->
+    date = getPrevKadobi(robot, Date.yesterday())
+    checkJisseki(date)
+  ).start()
+  # }}}
+
+  robot.respond /redmine [\s]*([\S]*)[\s]*(?:は|を|の)?(?:実績)?(?:check|チェック)(?:実績)?(する|して|しない)?/i, (msg) -> # {{{
+    name = msg.match[1].replace /(実績|チェック)/, ''
+    flg = msg.match[2]
+    if name and flg
+      user = whoIsThis robot, name
+      return msg.send "#{name} は\"面通し\"されてない" unless user
+      isNotCheck = false
+      isNotCheck = true if flg.match /(しない)/
+      setUserInfo robot, user, 'IS_NOT_CHECK_JISSEKI', isNotCheck
+      msg.send "次から #{user} の実績チェック#{flg}!"
+    else
+      date = getPrevKadobi(@robot, Date.yesterday())
+      checkJisseki date
+  # }}}
+
+  robot.hear /.*(#(\d+)).*/, (msg) -> # {{{
     id = msg.match[1].replace /#/, ""
     return if isNaN id
     redmine.Issue(id).show null, (err, issue) ->
@@ -248,17 +350,20 @@ module.exports = (robot) ->
       for i, v of issue.children
         spent_hours += v.spent_hours || 0
       msg.send "#{url} : #{issue.subject}(予: #{estimated_hours}h / 消: #{spent_hours}h) - #{issue.project.name}"
+  # }}}
 
-  robot.respond /redmine[\s]+([\S]*)[\s]*実績(詳細)?/, (msg) ->
+  robot.respond /redmine[\s]+([\S]*)[\s]*実績(詳細)?/, (msg) -> # {{{
     command = msg.match[1]
+    return if msg.message.match /(check|チェック)/
+    d = getPrevKadobi(robot, Date.yesterday())
     params =
-      from:  Date.yesterday().toFormat('YYYY-MM-DD')
-      to:  Date.yesterday().toFormat('YYYY-MM-DD')
+      from: d.toYMD()
+      to: d.toYMD()
     isDetail = true if msg.match[2]
 
     redmine.TimeEntry().get params, (err, timeEntries) ->
       return msg.send 'Error!: ' + err if err or timeEntries is null
-      return msg.send "誰も実績入れてません!" unless timeEntries.length
+      return msg.send "#{params.from} 〜 #{params.to} に誰も実績入れてません!" unless timeEntries.length
       messages = {}
       for k, v of timeEntries
         id = v.user.id
@@ -283,7 +388,7 @@ module.exports = (robot) ->
            for issueId, issue of m.issues
              reply += "  ##{issueId}: #{issue.hours}h #{issue.comments}\n"
       msg.send reply
-
+  # }}}
 
 #    userName = msg.match[1].toLowerCase()
 #    user = whoIsThis robot, userName
