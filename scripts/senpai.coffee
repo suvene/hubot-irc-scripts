@@ -12,8 +12,10 @@
 #   {アダ名 or nickname}++  - イイネ！
 #   {アダ名 or nickname}--  - ヨクナイネ！
 #   hubot {アダ名 or nickname} 何点ですか?  - hubot に後輩の点数を教えてもらおう!
+#   hubot 設定 <yyyy-mm-dd> は休日(じゃない) - 先輩に出勤日を教えよう!
 
 _ = require('underscore')
+DateUtil = require('date-utils')
 
 # {{{ AISATSU
 AISATSU_YOROSHIKU = [
@@ -411,7 +413,7 @@ module.exports = (robot) ->
       msg.send "#{name}: #{count}点 " + msg.random COUNT_MINUS
 # }}}
 
-  robot.respond /([^ ]+)[ ]*何点/i, (msg) -># {{{
+  robot.respond /([^ ]+)[ ]*何点/i, (msg) -> # {{{
     name = msg.match[1]
     name = trimKeisho name
     user = whoIsThis robot, msg, name
@@ -429,9 +431,29 @@ module.exports = (robot) ->
     msg.send history.show 5
 
     checkKeigo robot, msg
+  # }}}
+
+# 設定 {{{
+  robot.respond /設定 ([^ ]+) は休日(じゃない)?$/i, (msg) -> # {{{
+    d = new Date(msg.match[1])
+    return msg.send "#{d} は日付じゃない" unless Date.validateDay(d.getDate(), d.getFullYear(), d.getMonth())
+    d = d.toYMD()
+
+    flg = true
+    flg = !msg.match[2]?.match /じゃない/
+    gHolidays = getSenpaiStorage robot, msg, 'HOLIDAYS'
+    gHolidays ||= {}
+
+    gHolidays[d] = flg
+    if flg
+      msg.send "#{d} を休日に設定した"
+    else
+      msg.send "#{d} は休日ではない！"
+    setSenpaiStorage robot, msg, 'HOLIDAYS', gHolidays
+  # }}}
 # }}}
 
-  # cace sensitive
+  # change realname(cace sensitive) # {{{
   robot.respond /([^ ]+)[ ]*→[ ]*([^ ]+)/i, (msg) ->
     fromname = msg.match[1]
     toname = msg.match[2]
@@ -459,6 +481,7 @@ module.exports = (robot) ->
       newNicknames[k] = v?.replace new RegExp('^' + fromname + '$'), toname
     console.log newNicknames
     setSenpaiStorage robot, msg, 'NICKNAMES', newNicknames
+    # }}}
 
   robot.respond /DIE$/i, (msg) ->
     process.exit 0
