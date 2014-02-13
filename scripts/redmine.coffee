@@ -438,7 +438,7 @@ module.exports = (robot) ->
     console.log dateYMD
 
     if userComments?
-      comments = "#{msg.message.user.name}: #{userComments}"
+      comments = "#{userComments}"
     else
       comments = "Time logged by: #{msg.message.user.name}"
     activityId = getActivityId activity
