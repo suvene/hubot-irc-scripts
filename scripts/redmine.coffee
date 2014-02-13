@@ -193,7 +193,7 @@ class Redmine # {{{
         callback null, timeEntries
 
     create: (attributes, callback, opt) =>
-      @post "/time_entries.json", {time_entry: attributes}, opt, callback
+      @post "/time_entries.json", {time_entry: attributes, su_userid: attributes.su_userid}, opt, callback
 # }}}
 
   getActivity: () -> # {{{
@@ -459,7 +459,7 @@ module.exports = (robot) ->
         spent_on: dateYMD
         hours: hours
         comments: comments
-        user_id: redmineUser.id
+        su_userid: redmineUser.id
         activity_id: activityId
 
       redmine.TimeEntry().create attributes, (error, data, response) ->
