@@ -79,7 +79,8 @@ getPrevKadobi = (robot, date) -> # {{{
   loop
     week = date.getDay()
     gHolidays = getSenpaiStorage robot, 'HOLIDAYS'
-    if week is 6 or week is 7 or gHolidays[date.toYMD()]
+    # console.log "week: #{week}"
+    if week is 0 or week is 6 or gHolidays[date.toYMD()]
       date = date.addDays(-1)
       continue
     break
