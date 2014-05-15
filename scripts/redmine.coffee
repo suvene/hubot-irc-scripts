@@ -213,13 +213,12 @@ class Redmine # {{{
           summary = item.summary.replace /<("[^"]*"|'[^']*'|[^'">])*>/g, ''
           # console.log summary
           matches = summary.match /([\r\n]*)([^\r\n]*)([\r\n]*)?(.*)/
-          text += '  ' + matches[2] if matches[2]
+          text += '  ' + matches[2].substring(0, 60) if matches[2]
           text += '...つづく...' if matches[4]
           # console.log 'matches[1]:' + matches[1]
           # console.log 'matches[2]:' + matches[2]
           # console.log 'matches[4]:' + matches[4]
         text = text.replace /<("[^"]*"|'[^']*'|[^'">])*>/g, ''
-        text = text.substring(256)
         # console.log text
         continue if text in cacheActivities
         cacheActivities.push text
