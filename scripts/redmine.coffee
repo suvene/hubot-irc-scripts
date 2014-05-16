@@ -87,6 +87,7 @@ getPrevKadobi = (robot, date) -> # {{{
   return date
 # }}}
 
+# from enumrations
 getActivityId = (activity) -> # {{{
   return 8 if activity.match /要件定義/
   return 9 if activity.match /製造/
@@ -114,6 +115,7 @@ getActivityId = (activity) -> # {{{
   return 37 if activity.match /結テ実/
   return 38 if activity.match /PMO/
   return 39 if activity.match /ユーザー環境/
+  return 40 if activity.match /サポート/
   return null
 # }}}
 
