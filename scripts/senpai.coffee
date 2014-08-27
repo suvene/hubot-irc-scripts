@@ -376,6 +376,22 @@ module.exports = (robot) ->
       msg.send "#{name}: #{count}点 " + msg.random COUNT_PLUS
 # }}}
 
+# {{{ oper
+  robot.enter (msg) ->
+    fromname = msg.message.user.name
+    fromuser = whoIsThis robot, msg, fromname
+    unless fromuser
+      return
+
+    nickname = fromname
+    nicknames = getUserInfo robot, msg, fromuser, 'NICKNAMES'
+    if nicknames.length > 1
+      nickname = nicknames[Math.floor(Math.random() * nicknames.length)]
+
+    msg.send "#{nickname} になるとやるよ"
+    robot.adapter.bot.send 'MODE', msg.envelope.room, '+o', msg.envelope.user.name
+# }}}
+
 # {{{ minusminus
   robot.hear /([^ ]+)(--[ ]*(.*))/i, (msg) ->
     fromname = msg.message.user.name
