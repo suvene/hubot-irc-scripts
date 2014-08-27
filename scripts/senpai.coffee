@@ -383,6 +383,9 @@ module.exports = (robot) ->
     unless fromuser
       return
 
+    if fromname is robot.name
+      return
+
     nickname = fromname
     nicknames = getUserInfo robot, msg, fromuser, 'NICKNAMES'
     if nicknames.length > 1
