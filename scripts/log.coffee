@@ -14,6 +14,7 @@ DateUtil = require 'date-utils'
 escape = require('validator').escape
 #exec = require('child_process').exec
 PATH_LOG_ROOT = process.env.HUBOT_LOG_ROOT
+IRC_LOG_LIMIT = process.env.HUBOT_IRC_LOG_LIMIT
 
 createMySqlClient = (robot) -># {{{
   unless @client
@@ -255,7 +256,7 @@ getLogs = (robot, req, res) -> # {{{
     query =   """
        select * from (select id, event_time, channel, nick, message from log
        where (command = 'PRIVMSG' or command = 'NOTICE')
-       order by id desc limit 1000) b
+       order by id desc limit #{IRC_LOG_LIMIT}) b
        order by b.id
     """
 
