@@ -162,7 +162,7 @@ class Aipo
         $ = cheerio.load data
         callback null, response, $
       else
-        console.log 'error: ' + response?.statusCode
+        console.log 'aipo error: ' + response?.statusCode
         console.log error
         @send "Aipo がなんかエラーやわ"
 
