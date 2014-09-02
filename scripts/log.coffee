@@ -103,7 +103,7 @@ htmlContent = (robot, req, logs) -> # {{{
 
     <div style="padding-left: 20px">
       <input id="localSearch" type="search" placeholder="Local Search">
-      <div class="pagination"><ul id="gridPage"></ul></div>
+      <div class="pagination"><<< Newer - Older >>><ul id="gridPage"></ul></div>
       <div id="logsGrid" class="table table-striped table-bordered table-hover table-condensed">
   """
 # dont use, becase use handsontable
@@ -202,6 +202,7 @@ htmlContent = (robot, req, logs) -> # {{{
           var searcharray = [];
           if (value) {
             for (row = 0, r_len = data.length; row < r_len; row++) {
+            //for (row = data.length - 1, r_len >= 0; row >= r_len; row--) {
               for (col = 0, c_len = _data[row].length; col < c_len; col++) {
                 if (_data[row][col] == null) {
                   continue;
@@ -216,13 +217,16 @@ htmlContent = (robot, req, logs) -> # {{{
             getgridData(searcharray, "1", noOfRowstoShow);
 
           } else {
-            getgridData(myData, "1", noOfRowstoShow);
+            getgridData(_data, "1", noOfRowstoShow);
           }
         });
 
         function getgridData(res, hash, noOfRowstoShow) {
           var page = parseInt(hash.replace('#', ''), 10) || 1, limit = noOfRowstoShow, row = (page - 1) * limit, count = page * limit, part = [];
-          for (; row < count; row++) {
+          //for (; row < count; row++) {
+          var minRow = row;
+          row = count - 1;
+          for (; row >= minRow; row--) {
             if (res[row] != null) {
               part.push(res[row]);
             }
@@ -250,6 +254,7 @@ htmlContent = (robot, req, logs) -> # {{{
 # }}}
 
 getLogs = (robot, req, res) -> # {{{
+  ret = []
   try
     @client = createMySqlClient robot
 
@@ -267,12 +272,15 @@ getLogs = (robot, req, res) -> # {{{
         console.log 'getLogs query error'
         console.log err
 
-      res.end(htmlContent robot, req, results)
+      # reverse
+      ret.push item for item in results by -1
+
+      res.end(htmlContent robot, req, ret)
 
   catch e
     console.log 'getLogs error'
     console.log e
-    res.end(htmlContent robot, req, [])
+    res.end(htmlContent robot, req, ret)
 # }}}
 
 module.exports = (robot) ->
