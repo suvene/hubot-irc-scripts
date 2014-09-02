@@ -310,15 +310,27 @@ module.exports = (robot) ->
         # }}}
 
         # {{{ mecab
-        unless @mecab
-          @mecab = new MeCab unless @mecab
-          console.log 'create mecab!!!'
-        result = @mecab.parseSync message
-        mecabstr = ""
-        # console.lochannel:#{channel} nick:#{nick}g result
-        for item in result when !(/(助詞|助動詞)/.test item[1].split("\t")[3])
-          (sub = item[1].split("\t"); mecabstr += ' ' + item[0] + ' ' + sub[1] + ' ' + sub[2])
-        # console.log mecabstr
+        try
+          unless @mecab
+            @mecab = new MeCab
+            console.log 'create mecab!!!'
+          replaced = message.replace /['\\]/g, (str, offset, s) ->
+            ESCAPE = {
+              "'": "'"
+              "\\": "\\"
+            }
+            ESCAPE[str] + str
+          replaced = "'" + replaced + "'"
+          result = @mecab.parseSync replaced
+          mecabstr = ""
+          # console.lochannel:#{channel} nick:#{nick}g result
+          for item in result when !(/(助詞|助動詞)/.test item[1].split("\t")[3])
+            (sub = item[1].split("\t"); mecabstr += ' ' + item[0] + ' ' + sub[1] + ' ' + sub[2])
+          # console.log mecabstr
+        catch e
+          console.log 'mecab error'
+          console.log e
+          throw e
         # }}}
 
         # {{{ mysql log
@@ -354,7 +366,7 @@ module.exports = (robot) ->
 
           log = () ->
             #fs.appendFile "#{dir}/#{year}-#{month}-#{date}.log", logContent, console.log.bind console
-            fs.appendFile "#{dir}/#{year}-#{month}-#{date}.log", logContent, 'utf8'
+            fs.appendFile "#{dir}/#{year}-#{month}-#{date}.log", logContent
           fs.exists(dir, (exists)->
             if exists
               log()
