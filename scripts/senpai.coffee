@@ -391,7 +391,7 @@ module.exports = (robot) ->
     if nicknames.length > 1
       nickname = nicknames[Math.floor(Math.random() * nicknames.length)]
 
-    msg.send "#{nickname} になるとやるよ"
+    #msg.send "#{nickname} になるとやるよ"
     robot.adapter.bot.send 'MODE', msg.envelope.room, '+o', msg.envelope.user.name
 # }}}
 
