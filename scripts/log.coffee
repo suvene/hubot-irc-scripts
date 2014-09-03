@@ -49,12 +49,12 @@ htmlContent = (robot, req, logs) -> # {{{
     <!-- Optional theme -->
     <!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css" -->
 
-    <!-- for handsontable { -->
+    <!-- for handsontable (bootstrap 2.3.1) { -->
     <link rel="stylesheet" href="https://v157-7-208-230.myvps.jp/javascripts/vendor/bootstrap.min.css">
     <link rel="stylesheet" href="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.handsontable.full.css">
     <link rel="stylesheet" href="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.handsontable.bootstrap.css">
     <style type="text/css">
-      .localSearched {
+      .localFiltered {
         background: #ffcfaa;
         color: #583707;
       }
@@ -88,22 +88,37 @@ htmlContent = (robot, req, logs) -> # {{{
     <title>HRS IRC log</title>
   </head>
   <body>
-    <h1>HRS IRC log</h1>
-    <div class="container">
-    <div class="row">
-      <form class="navbar-form navbar-left" role="search">
-        <div class="form-group">
-          <input type="text" name="text" class="form-control col-md-6" placeholder="Seach Text" value="#{text}">
-          <!--button type="submit" id="doSearch" class="btn btn-default">検索</button-->
-        </div>
-      </form>
-      <hr>
-    </div> <!-- /.row -->
-    </div> <!-- /.container -->
+    <div class="navbar">
+      <div class="navbar-inner">
+        <div class="container">
+          <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+
+          <!-- Be sure to leave the brand out there if you want it shown -->
+          <a class="brand" href="#">HRS IRC log</a>
+
+          <!-- Everything you want hidden at 940px or less, place within here -->
+          <div class="nav-collapse collapse">
+            <!-- .nav, .navbar-search, .navbar-form, etc -->
+              <form class="navbar-form">
+                <input type="text" name="text" class="span4 search-query" placeholder="Seach Text" value="#{text}">
+                <input type="hidden" name="q" value="s">
+                <span class="help-block"><p class="text-info">ex.) channel:HRS nick:suVene,h_sakaguchi free_word1 "free Key Word2"</p></span>
+              </form>
+            </div> <!-- /.row -->
+          </div><!-- /.nav-collapse collapse -->
+        </div><!-- /.container -->
+      </div><!-- /.navbar-inner -->
+    </div><!-- /.navbar -->
+
 
     <div style="padding-left: 20px">
-      <input id="localSearch" type="search" placeholder="Local Search">
-      <div class="pagination"><<< Newer - Older >>><ul id="gridPage"></ul></div>
+      <div class="pagination"><ul class="pager" id="gridPage"></ul></div>
+      <input id="localFilter" type="search" class="search-query" placeholder="Local Filter">
       <div id="logsGrid" class="table table-striped table-bordered table-hover table-condensed">
   """
 # dont use, becase use handsontable
@@ -132,7 +147,7 @@ htmlContent = (robot, req, logs) -> # {{{
     <!-- Latest compiled and minified JavaScript -->
     <!--script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script-->
 
-    <!-- for handsontable { -->
+    <!-- for handsontable(jquery 1.10.2) { -->
     <script src="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.min.js"></script>
     <script src="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.handsontable.full.js"></script>
     <script src="https://v157-7-208-230.myvps.jp/javascripts/vendor/bootstrap.min.js"></script>
@@ -159,7 +174,7 @@ htmlContent = (robot, req, logs) -> # {{{
         };
         $window.on('resize', calculateSize);
 
-        var noOfRowstoShow = 20; //set the maximum number of rows that should be displayed per page.
+        var noOfRowstoShow = 50; //set the maximum number of rows that should be displayed per page.
 
         $logsGrid.handsontable({
           readOnly: true,
@@ -177,7 +192,7 @@ htmlContent = (robot, req, logs) -> # {{{
           currentRowClassName: 'active',
           currentColClassName: 'active',
           search: {
-            searchResultClass: 'localSearched',
+            searchResultClass: 'localFiltered',
             callback: searchResult
           },
         });
@@ -188,7 +203,7 @@ htmlContent = (robot, req, logs) -> # {{{
           getgridData(data, "1", noOfRowstoShow);
         }
 
-        //$('#localSearch').on('keyup', function (event) {
+        //$('#localFilter').on('keyup', function (event) {
         //  var hot = $logsGrid.handsontable('getInstance');
         //  var queryResult = hot.search.query(this.value);
         //  console.log(queryResult);
@@ -196,7 +211,7 @@ htmlContent = (robot, req, logs) -> # {{{
         //});
 
         // via. http://my-waking-dream.blogspot.jp/2013/12/live-search-filter-for-jquery.html
-        $('#localSearch').on('keyup', function (event) {
+        $('#localFilter').on('keyup', function (event) {
           var value = ('' + this.value).toLowerCase(), row, col, r_len, c_len, td;
           var _data = data;
           var searcharray = [];
@@ -242,6 +257,7 @@ htmlContent = (robot, req, logs) -> # {{{
             });
             $gridPage.append(element);
           }
+
           $logsGrid.handsontable('loadData', part);
           return part;
         }
