@@ -361,10 +361,10 @@ module.exports = (robot) ->
     checkUpdate()
   ).start()
 
-  new cronJob('0 15 9,12,15,18 * * *', () ->
-    date = getPrevKadobi(robot, Date.yesterday())
-    checkJisseki(date)
-  ).start()
+#  new cronJob('0 15 9,12,15,18 * * *', () ->
+#    date = getPrevKadobi(robot, Date.yesterday())
+#    checkJisseki(date)
+#  ).start()
   # }}}
 
   robot.respond /redmine [\s]*([\S]*)[\s]*(?:は|を|の)?(?:実績)?(?:check|チェック)(?:実績)?(する|して|しない)?/i, (msg) -> # {{{
