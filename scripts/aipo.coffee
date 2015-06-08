@@ -188,7 +188,7 @@ module.exports = (robot) ->
     getTimeline()
 
   # *(sec) *(min) *(hour) *(day) *(month) *(day of the week)
-  new cronJob('*/5 * * * * *', () ->
+  new cronJob('*/30 * * * * *', () ->
     checkUpdate()
   ).start()
 
