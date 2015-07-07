@@ -14,6 +14,7 @@ DateUtil = require 'date-utils'
 escape = require('validator').escape
 #exec = require('child_process').exec
 PATH_LOG_ROOT = process.env.HUBOT_LOG_ROOT
+IRC_LOG_LIMIT = process.env.HUBOT_IRC_LOG_LIMIT
 
 createMySqlClient = (robot) -># {{{
   unless @client
@@ -48,12 +49,12 @@ htmlContent = (robot, req, logs) -> # {{{
     <!-- Optional theme -->
     <!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css" -->
 
-    <!-- for handsontable { -->
+    <!-- for handsontable (bootstrap 2.3.1) { -->
     <link rel="stylesheet" href="https://v157-7-208-230.myvps.jp/javascripts/vendor/bootstrap.min.css">
     <link rel="stylesheet" href="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.handsontable.full.css">
     <link rel="stylesheet" href="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.handsontable.bootstrap.css">
     <style type="text/css">
-      .localSearched {
+      .localFiltered {
         background: #ffcfaa;
         color: #583707;
       }
@@ -87,22 +88,37 @@ htmlContent = (robot, req, logs) -> # {{{
     <title>HRS IRC log</title>
   </head>
   <body>
-    <h1>HRS IRC log</h1>
-    <div class="container">
-    <div class="row">
-      <form class="navbar-form navbar-left" role="search">
-        <div class="form-group">
-          <input type="text" name="text" class="form-control col-md-6" placeholder="Seach Text" value="#{text}">
-          <!--button type="submit" id="doSearch" class="btn btn-default">検索</button-->
-        </div>
-      </form>
-      <hr>
-    </div> <!-- /.row -->
-    </div> <!-- /.container -->
+    <div class="navbar">
+      <div class="navbar-inner">
+        <div class="container">
+          <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+
+          <!-- Be sure to leave the brand out there if you want it shown -->
+          <a class="brand" href="#">HRS IRC log</a>
+
+          <!-- Everything you want hidden at 940px or less, place within here -->
+          <div class="nav-collapse collapse">
+            <!-- .nav, .navbar-search, .navbar-form, etc -->
+              <form class="navbar-form">
+                <input type="text" name="text" class="span4 search-query" placeholder="Seach Text" value="#{text}">
+                <input type="hidden" name="q" value="s">
+                <span class="help-block"><p class="text-info">ex.) channel:HRS nick:suVene,h_sakaguchi free_word1 "free Key Word2"</p></span>
+              </form>
+            </div> <!-- /.row -->
+          </div><!-- /.nav-collapse collapse -->
+        </div><!-- /.container -->
+      </div><!-- /.navbar-inner -->
+    </div><!-- /.navbar -->
+
 
     <div style="padding-left: 20px">
-      <input id="localSearch" type="search" placeholder="Local Search">
-      <div class="pagination"><ul id="gridPage"></ul></div>
+      <div class="pagination"><ul class="pager" id="gridPage"></ul></div>
+      <input id="localFilter" type="search" class="search-query" placeholder="Local Filter">
       <div id="logsGrid" class="table table-striped table-bordered table-hover table-condensed">
   """
 # dont use, becase use handsontable
@@ -131,7 +147,7 @@ htmlContent = (robot, req, logs) -> # {{{
     <!-- Latest compiled and minified JavaScript -->
     <!--script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script-->
 
-    <!-- for handsontable { -->
+    <!-- for handsontable(jquery 1.10.2) { -->
     <script src="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.min.js"></script>
     <script src="https://v157-7-208-230.myvps.jp/javascripts/vendor/jquery.handsontable.full.js"></script>
     <script src="https://v157-7-208-230.myvps.jp/javascripts/vendor/bootstrap.min.js"></script>
@@ -158,7 +174,7 @@ htmlContent = (robot, req, logs) -> # {{{
         };
         $window.on('resize', calculateSize);
 
-        var noOfRowstoShow = 20; //set the maximum number of rows that should be displayed per page.
+        var noOfRowstoShow = 50; //set the maximum number of rows that should be displayed per page.
 
         $logsGrid.handsontable({
           readOnly: true,
@@ -176,7 +192,7 @@ htmlContent = (robot, req, logs) -> # {{{
           currentRowClassName: 'active',
           currentColClassName: 'active',
           search: {
-            searchResultClass: 'localSearched',
+            searchResultClass: 'localFiltered',
             callback: searchResult
           },
         });
@@ -187,7 +203,7 @@ htmlContent = (robot, req, logs) -> # {{{
           getgridData(data, "1", noOfRowstoShow);
         }
 
-        //$('#localSearch').on('keyup', function (event) {
+        //$('#localFilter').on('keyup', function (event) {
         //  var hot = $logsGrid.handsontable('getInstance');
         //  var queryResult = hot.search.query(this.value);
         //  console.log(queryResult);
@@ -195,12 +211,13 @@ htmlContent = (robot, req, logs) -> # {{{
         //});
 
         // via. http://my-waking-dream.blogspot.jp/2013/12/live-search-filter-for-jquery.html
-        $('#localSearch').on('keyup', function (event) {
+        $('#localFilter').on('keyup', function (event) {
           var value = ('' + this.value).toLowerCase(), row, col, r_len, c_len, td;
           var _data = data;
           var searcharray = [];
           if (value) {
             for (row = 0, r_len = data.length; row < r_len; row++) {
+            //for (row = data.length - 1, r_len >= 0; row >= r_len; row--) {
               for (col = 0, c_len = _data[row].length; col < c_len; col++) {
                 if (_data[row][col] == null) {
                   continue;
@@ -215,13 +232,16 @@ htmlContent = (robot, req, logs) -> # {{{
             getgridData(searcharray, "1", noOfRowstoShow);
 
           } else {
-            getgridData(myData, "1", noOfRowstoShow);
+            getgridData(_data, "1", noOfRowstoShow);
           }
         });
 
         function getgridData(res, hash, noOfRowstoShow) {
           var page = parseInt(hash.replace('#', ''), 10) || 1, limit = noOfRowstoShow, row = (page - 1) * limit, count = page * limit, part = [];
-          for (; row < count; row++) {
+          //for (; row < count; row++) {
+          var minRow = row;
+          row = count - 1;
+          for (; row >= minRow; row--) {
             if (res[row] != null) {
               part.push(res[row]);
             }
@@ -237,6 +257,7 @@ htmlContent = (robot, req, logs) -> # {{{
             });
             $gridPage.append(element);
           }
+
           $logsGrid.handsontable('loadData', part);
           return part;
         }
@@ -249,13 +270,14 @@ htmlContent = (robot, req, logs) -> # {{{
 # }}}
 
 getLogs = (robot, req, res) -> # {{{
+  ret = []
   try
     @client = createMySqlClient robot
 
     query =   """
        select * from (select id, event_time, channel, nick, message from log
        where (command = 'PRIVMSG' or command = 'NOTICE')
-       order by id desc limit 1000) b
+       order by id desc limit #{IRC_LOG_LIMIT}) b
        order by b.id
     """
 
@@ -266,12 +288,15 @@ getLogs = (robot, req, res) -> # {{{
         console.log 'getLogs query error'
         console.log err
 
-      res.end(htmlContent robot, req, results)
+      # reverse
+      ret.push item for item in results by -1
+
+      res.end(htmlContent robot, req, ret)
 
   catch e
     console.log 'getLogs error'
     console.log e
-    res.end(htmlContent robot, req, [])
+    res.end(htmlContent robot, req, ret)
 # }}}
 
 module.exports = (robot) ->
@@ -301,15 +326,27 @@ module.exports = (robot) ->
         # }}}
 
         # {{{ mecab
-        unless @mecab
-          @mecab = new MeCab unless @mecab
-          console.log 'create mecab!!!'
-        result = @mecab.parseSync message
-        mecabstr = ""
-        # console.lochannel:#{channel} nick:#{nick}g result
-        for item in result when !(/(助詞|助動詞)/.test item[1].split("\t")[3])
-          (sub = item[1].split("\t"); mecabstr += ' ' + item[0] + ' ' + sub[1] + ' ' + sub[2])
-        # console.log mecabstr
+        try
+          unless @mecab
+            @mecab = new MeCab
+            console.log 'create mecab!!!'
+          replaced = message.replace /['\\]/g, (str, offset, s) ->
+            ESCAPE = {
+              "'": "'"
+              "\\": "\\"
+            }
+            ESCAPE[str] + str
+          replaced = "'" + replaced + "'"
+          result = @mecab.parseSync replaced
+          mecabstr = ""
+          # console.lochannel:#{channel} nick:#{nick}g result
+          for item in result when !(/(助詞|助動詞)/.test item[1].split("\t")[3])
+            (sub = item[1].split("\t"); mecabstr += ' ' + item[0] + ' ' + sub[1] + ' ' + sub[2])
+          # console.log mecabstr
+        catch e
+          console.log 'mecab error'
+          console.log e
+          throw e
         # }}}
 
         # {{{ mysql log
@@ -345,7 +382,7 @@ module.exports = (robot) ->
 
           log = () ->
             #fs.appendFile "#{dir}/#{year}-#{month}-#{date}.log", logContent, console.log.bind console
-            fs.appendFile "#{dir}/#{year}-#{month}-#{date}.log", logContent, 'utf8'
+            fs.appendFile "#{dir}/#{year}-#{month}-#{date}.log", logContent
           fs.exists(dir, (exists)->
             if exists
               log()
